@@ -20,11 +20,9 @@ async def handle_join_request(
         return
 
     subs = SubsService(session)
+    # Record that user sent join request to this Zayafka channel
+    # This marks it as "requested" so it won't show in subscription checks
     await subs.approve_zayafka(user.id, request.chat.id)
 
-    try:
-        await bot.approve_chat_join_request(
-            chat_id=request.chat.id, user_id=request.from_user.id
-        )
-    except Exception as exc:
-        logger.warning("Failed to approve join request: %s", exc)
+    # Note: Auto-approval is removed. Admin will manually approve join requests
+    # in the Telegram channel. This ensures better control over who joins.
