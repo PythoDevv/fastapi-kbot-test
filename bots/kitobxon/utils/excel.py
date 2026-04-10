@@ -1,3 +1,4 @@
+import csv
 import io
 from typing import Any
 
@@ -52,6 +53,37 @@ def export_users_to_excel(users: list) -> io.BytesIO:
     return buf
 
 
+def generate_questions_template() -> tuple[io.BytesIO, str]:
+    """Generate template file for questions import (.xlsx with example row)"""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Savollar Namuna"
+
+    headers = ["Savol", "To'g'ri javob", "Noto'g'ri 1", "Noto'g'ri 2", "Noto'g'ri 3"]
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(fill_type="solid", fgColor="2E4057")
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    ws.row_dimensions[1].height = 30
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+
+    # Example row
+    ws.append(["Misol savol?", "To'g'ri javob", "Noto'g'ri 1", "Noto'g'ri 2", "Noto'g'ri 3"])
+
+    col_widths = [50, 30, 30, 30, 30]
+    for col_idx, width in enumerate(col_widths, 1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf, "xlsx"
+
+
 def export_questions_to_excel(questions: list) -> io.BytesIO:
     """Export questions to Excel with columns: Question, Correct, Wrong1, Wrong2, Wrong3"""
     wb = openpyxl.Workbook()
@@ -87,37 +119,85 @@ def export_questions_to_excel(questions: list) -> io.BytesIO:
     return buf
 
 
-def import_questions_from_excel(path: str) -> list[dict[str, Any]]:
+def import_questions_from_excel(path: str) -> tuple[list[dict[str, Any]], list[str]]:
     """
-    Excel format:
+    Excel/CSV format:
     Column A: Question text
     Column B: Correct answer
     Column C: Wrong answer 1
     Column D: Wrong answer 2
     Column E: Wrong answer 3
+
+    Returns: (questions_list, errors_list)
     """
-    wb = openpyxl.load_workbook(path)
-    ws = wb.active
     questions = []
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        text, correct, w1, w2, w3 = (str(v).strip() if v else "" for v in (row[:5] + ("",) * 5)[:5])
-        if not text or not correct:
+    errors = []
+    rows = []
+
+    try:
+        if path.endswith('.xlsx'):
+            wb = openpyxl.load_workbook(path)
+            ws = wb.active
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                rows.append(list(row) if row else [])
+        elif path.endswith('.csv'):
+            with open(path, 'r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                next(reader, None)  # Skip header
+                for row in reader:
+                    rows.append(row)
+        else:
+            errors.append("Fayl formati noto'g'ri. Faqat .xlsx yoki .csv qabul qilinadi.")
+            return questions, errors
+    except Exception as e:
+        errors.append(f"Faylni o'qishda xatolik: {e}")
+        return questions, errors
+
+    for row_idx, row in enumerate(rows, start=2):
+        if not any(row):
             continue
-        questions.append(
-            dict(
-                text=text,
-                correct=correct,
-                wrong_1=w1 or "—",
-                wrong_2=w2 or "—",
-                wrong_3=w3 or "—",
+
+        try:
+            text = str(row[0]).strip() if len(row) > 0 and row[0] else ""
+            correct = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+            w1 = str(row[2]).strip() if len(row) > 2 and row[2] else ""
+            w2 = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+            w3 = str(row[4]).strip() if len(row) > 4 and row[4] else ""
+
+            if not text:
+                errors.append(f"Qator {row_idx}: Savol yo'q.")
+                continue
+            if not correct:
+                errors.append(f"Qator {row_idx}: To'g'ri javob yo'q.")
+                continue
+            if not w1:
+                errors.append(f"Qator {row_idx}: Noto'g'ri javob 1 yo'q.")
+                continue
+            if not w2:
+                errors.append(f"Qator {row_idx}: Noto'g'ri javob 2 yo'q.")
+                continue
+            if not w3:
+                errors.append(f"Qator {row_idx}: Noto'g'ri javob 3 yo'q.")
+                continue
+
+            questions.append(
+                dict(
+                    text=text,
+                    correct=correct,
+                    wrong_1=w1,
+                    wrong_2=w2,
+                    wrong_3=w3,
+                )
             )
-        )
-    return questions
+        except Exception as e:
+            errors.append(f"Qator {row_idx}: {e}")
+
+    return questions, errors
 
 
-def import_users_from_excel(path: str) -> list[dict[str, Any]]:
+def import_users_from_excel(path: str) -> tuple[list[dict[str, Any]], list[str]]:
     """
-    Excel format for importing users:
+    Excel/CSV format for importing users:
     Column A: Telegram ID
     Column B: FIO
     Column C: Username
@@ -125,24 +205,49 @@ def import_users_from_excel(path: str) -> list[dict[str, Any]]:
     Column E: Referrals count
     Column F: Score
     Column G: Referred by (user ID)
-    """
-    wb = openpyxl.load_workbook(path)
-    ws = wb.active
-    users = []
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        if not row or not row[0]:  # Skip empty rows
-            continue
-        try:
-            telegram_id = int(row[0]) if row[0] else None
-            fio = str(row[1]).strip() if row[1] else None
-            username = str(row[2]).strip() if row[2] else None
-            mobile_number = str(row[3]).strip() if row[3] else None
-            referrals_count = int(row[4]) if row[4] else 0
-            score = int(row[5]) if row[5] else 0
-            referred_by = int(row[6]) if row[6] else None
 
-            if not telegram_id:
+    Returns: (users_list, errors_list)
+    """
+    users = []
+    errors = []
+    rows = []
+
+    try:
+        if path.endswith('.xlsx'):
+            wb = openpyxl.load_workbook(path)
+            ws = wb.active
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                rows.append(list(row) if row else [])
+        elif path.endswith('.csv'):
+            with open(path, 'r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                next(reader, None)  # Skip header
+                for row in reader:
+                    rows.append(row)
+        else:
+            errors.append("Fayl formati noto'g'ri. Faqat .xlsx yoki .csv qabul qilinadi.")
+            return users, errors
+    except Exception as e:
+        errors.append(f"Faylni o'qishda xatolik: {e}")
+        return users, errors
+
+    for row_idx, row in enumerate(rows, start=2):
+        if not any(row):
+            continue
+
+        try:
+            tid_raw = row[0] if len(row) > 0 else None
+            if not tid_raw or str(tid_raw).strip() == "":
+                errors.append(f"Qator {row_idx}: Telegram ID yo'q.")
                 continue
+
+            telegram_id = int(float(str(tid_raw).strip()))
+            fio = str(row[1]).strip() if len(row) > 1 and row[1] else None
+            username = str(row[2]).strip() if len(row) > 2 and row[2] else None
+            mobile_number = str(row[3]).strip() if len(row) > 3 and row[3] else None
+            referrals_count = int(float(str(row[4]).strip())) if len(row) > 4 and row[4] else 0
+            score = int(float(str(row[5]).strip())) if len(row) > 5 and row[5] else 0
+            referred_by = int(float(str(row[6]).strip())) if len(row) > 6 and row[6] else None
 
             users.append({
                 "telegram_id": telegram_id,
@@ -153,6 +258,9 @@ def import_users_from_excel(path: str) -> list[dict[str, Any]]:
                 "score": score,
                 "referred_by": referred_by,
             })
-        except (ValueError, IndexError):
-            continue
-    return users
+        except ValueError as e:
+            errors.append(f"Qator {row_idx}: {e}")
+        except Exception as e:
+            errors.append(f"Qator {row_idx}: {e}")
+
+    return users, errors

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m 'feat: add question export to Excel:*)",
+      "Bash(python3 -m py_compile bots/kitobxon/handlers/admin/questions.py)",
+      "Bash(git commit -m 'fix: prevent questions handler from catching user import files:*)",
+      "Bash(python3 -m py_compile bots/kitobxon/handlers/admin/export.py)",
+      "Bash(git commit -m 'fix: handle cancel in user import state:*)",
+      "Bash(python3 -m py_compile bots/kitobxon/utils/excel.py bots/kitobxon/states.py bots/kitobxon/keyboards/inline.py bots/kitobxon/handlers/admin/questions.py bots/kitobxon/handlers/admin/export.py)",
+      "Bash(git commit -m 'feat: improve import/export with CSV support and better error messages:*)"
+    ]
+  }
+}

@@ -62,6 +62,20 @@ async def delete_question(cb: CallbackQuery, session: AsyncSession) -> None:
     await cb.answer("O'chirildi.")
 
 
+@router.callback_query(F.data == "q_template")
+async def download_template(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+    from bots.kitobxon.utils.excel import generate_questions_template
+    buf, ext = generate_questions_template()
+    await cb.message.answer_document(
+        document=BufferedInputFile(buf.read(), filename=f"savollar_namuna.{ext}"),
+        caption="📄 Savollar uchun namuna fayl.\n\nIltimos, ushbu formatda to'ldirib, qayta yuklang.",
+    )
+    await cb.answer()
+
+
 @router.callback_query(F.data == "q_add")
 async def start_add_question(
     cb: CallbackQuery, state: FSMContext, session: AsyncSession
@@ -118,11 +132,35 @@ async def q_wrong3(
     await message.answer("Savol qo'shildi ✅", reply_markup=reply.admin_panel())
 
 
-# Excel import
+@router.callback_query(F.data == "q_import_start")
+async def start_import_questions(
+    cb: CallbackQuery, state: FSMContext, session: AsyncSession
+) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+    from bots.kitobxon.states import AdminQuestionImportStates
+    await state.set_state(AdminQuestionImportStates.waiting_file)
+    await cb.message.answer(
+        "<b>📥 Savollar faylini yuklang</b>\n\n"
+        "Format: .xlsx yoki .csv\n"
+        "Ustunlar: Savol, To'g'ri javob, Noto'g'ri 1, Noto'g'ri 2, Noto'g'ri 3\n\n"
+        "Namuna olish uchun savollar ro'yxatiga qaytib, 'Namuna' tugmasini bosing.",
+        reply_markup=reply.cancel_only(),
+    )
+    await cb.answer()
+
+
+# Excel/CSV import
 @router.message(
     F.document,
-    F.document.mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ~StateFilter(AdminImportStates.waiting_users_file)
+    F.document.mime_type.in_(
+        [
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv",
+        ]
+    ),
+    ~StateFilter(AdminImportStates.waiting_users_file),
 )
 async def import_questions_excel(
     message: Message, session: AsyncSession, bot: Bot
@@ -136,15 +174,25 @@ async def import_questions_excel(
         await bot.download_file(file.file_path, tmp.name)
         tmp_path = tmp.name
     try:
-        questions = import_questions_from_excel(tmp_path)
+        questions, errors = import_questions_from_excel(tmp_path)
         added = 0
         service = AdminService(session)
         for q in questions:
             await service.add_question(**q)
             added += 1
-        await message.answer(f"✅ {added} ta savol import qilindi.")
+
+        result_msg = f"✅ <b>{added} ta savol import qilindi.</b>"
+
+        if errors:
+            result_msg += f"\n\n❌ <b>Xatoliklar ({len(errors)} ta):</b>\n"
+            for err in errors[:10]:
+                result_msg += f"{err}\n"
+            if len(errors) > 10:
+                result_msg += f"... va yana {len(errors) - 10} ta xatolik."
+
+        await message.answer(result_msg)
     except Exception as exc:
-        logger.exception("Excel import error: %s", exc)
-        await message.answer(f"Xato: {exc}")
+        logger.exception("Import error: %s", exc)
+        await message.answer(f"❌ Xato: {exc}")
     finally:
         os.unlink(tmp_path)

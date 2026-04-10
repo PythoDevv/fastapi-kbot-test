@@ -88,7 +88,8 @@ async def import_users_file(
         tmp_path = tmp.name
 
     try:
-        users_data = import_users_from_excel(tmp_path)
+        progress = await message.answer("Fayl qayta ishlanmoqda... ⏳")
+        users_data, errors = import_users_from_excel(tmp_path)
 
         if not users_data:
             await message.answer("Faylda ma'lumot topilmadi.")
@@ -99,17 +100,26 @@ async def import_users_file(
         service = AdminService(session)
         updated, created, skipped = await service.import_users(users_data)
 
-        await state.clear()
-        await message.answer(
+        result_msg = (
             f"<b>✅ Import tamomlandi!</b>\n\n"
-            f"Yangi foydalanuvchilar: <b>{created}</b>\n"
-            f"Yangilangan: <b>{updated}</b>\n"
-            f"O'tkazib yuborilgan: <b>{skipped}</b>\n"
-            f"Jami: <b>{len(users_data)}</b>",
-            reply_markup=reply.admin_panel(),
+            f"➕ Yangi: <b>{created}</b>\n"
+            f"🔄 Yangilangan: <b>{updated}</b>\n"
+            f"📊 Jami: <b>{len(users_data)}</b>"
         )
+
+        if errors:
+            result_msg += f"\n\n❌ <b>Xatoliklar ({len(errors)} ta):</b>\n"
+            for err in errors[:10]:
+                result_msg += f"{err}\n"
+            if len(errors) > 10:
+                result_msg += f"... va yana {len(errors) - 10} ta xatolik."
+
+        await message.answer(result_msg, reply_markup=reply.admin_panel())
+        await message.bot.delete_message(message.chat.id, progress.message_id)
+
+        await state.clear()
     except Exception as e:
-        await message.answer(f"Xato: {str(e)}")
+        await message.answer(f"❌ Xato: {str(e)}")
         await state.clear()
     finally:
         os.unlink(tmp_path)

@@ -94,8 +94,14 @@ def questions_list_keyboard(questions) -> InlineKeyboardMarkup:
     ]
     buttons.append(
         [
-            InlineKeyboardButton(text="➕ Savol qo'shish", callback_data="q_add"),
-            InlineKeyboardButton(text="📥 Excel yukla", callback_data="q_export"),
+            InlineKeyboardButton(text="➕ Qo'shish", callback_data="q_add"),
+            InlineKeyboardButton(text="📄 Namuna", callback_data="q_template"),
+        ]
+    )
+    buttons.append(
+        [
+            InlineKeyboardButton(text="📥 Import", callback_data="q_import_start"),
+            InlineKeyboardButton(text="📤 Export", callback_data="q_export"),
         ]
     )
     return InlineKeyboardMarkup(inline_keyboard=buttons)

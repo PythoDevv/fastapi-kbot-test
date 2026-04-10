@@ -42,6 +42,10 @@ class AdminQuestionStates(StatesGroup):
     waiting_wrong_3 = State()
 
 
+class AdminQuestionImportStates(StatesGroup):
+    waiting_file = State()
+
+
 class AdminScoreStates(StatesGroup):
     waiting_user_id = State()
     waiting_new_score = State()
