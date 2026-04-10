@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+.env
+*.log
+.pytest_cache/
+.mypy_cache/
+static/certificates/*.png
+!static/certificates/template.png

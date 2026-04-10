@@ -1,0 +1,48 @@
+from aiogram.fsm.state import State, StatesGroup
+
+
+class AuthStates(StatesGroup):
+    awaiting_name = State()
+    awaiting_phone = State()
+    changing_name = State()
+    awaiting_how_did_find = State()
+
+
+class QuizStates(StatesGroup):
+    answering = State()
+
+
+class BroadcastStates(StatesGroup):
+    waiting_message = State()
+    waiting_confirmation = State()
+
+
+class AdminChannelStates(StatesGroup):
+    waiting_name = State()
+    waiting_link = State()
+    waiting_channel_id = State()
+
+
+class AdminZayafkaStates(StatesGroup):
+    waiting_name = State()
+    waiting_link = State()
+    waiting_channel_id = State()
+
+
+class AdminContentStates(StatesGroup):
+    waiting_text = State()
+    waiting_image = State()
+
+
+class AdminQuestionStates(StatesGroup):
+    waiting_text = State()
+    waiting_correct = State()
+    waiting_wrong_1 = State()
+    waiting_wrong_2 = State()
+    waiting_wrong_3 = State()
+
+
+class AdminScoreStates(StatesGroup):
+    waiting_user_id = State()
+    waiting_new_score = State()
+    waiting_reason = State()

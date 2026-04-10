@@ -1,0 +1,169 @@
+import json
+import random
+from datetime import datetime
+
+from sqlalchemy import func, select, update
+
+from bots.kitobxon.models import (
+    PollMap,
+    Question,
+    QuizSettings,
+    TestAnswer,
+    TestSession,
+)
+from bots.kitobxon.repositories.base import BaseRepository
+
+
+class QuizRepository(BaseRepository[Question]):
+    model = Question
+
+    # --- Settings ---
+    async def get_settings(self) -> QuizSettings | None:
+        stmt = select(QuizSettings).order_by(QuizSettings.id).limit(1)
+        return (await self.session.execute(stmt)).scalar_one_or_none()
+
+    async def ensure_settings(self) -> QuizSettings:
+        existing = await self.get_settings()
+        if existing:
+            return existing
+        settings = QuizSettings()
+        self.session.add(settings)
+        await self.session.flush()
+        return settings
+
+    # --- Questions ---
+    async def get_random_questions(self, count: int) -> list[Question]:
+        stmt = select(Question).order_by(func.random()).limit(count)
+        return list((await self.session.execute(stmt)).scalars().all())
+
+    async def get_questions_by_ids(self, ids: list[int]) -> list[Question]:
+        if not ids:
+            return []
+        stmt = select(Question).where(Question.id.in_(ids))
+        rows = list((await self.session.execute(stmt)).scalars().all())
+        order = {qid: i for i, qid in enumerate(ids)}
+        rows.sort(key=lambda q: order.get(q.id, 1_000_000))
+        return rows
+
+    async def count_questions(self) -> int:
+        return await self.count()
+
+    # --- Test sessions ---
+    async def get_active_session(self, user_id: int) -> TestSession | None:
+        stmt = (
+            select(TestSession)
+            .where(TestSession.user_id == user_id, TestSession.is_completed.is_(False))
+            .order_by(TestSession.id.desc())
+            .limit(1)
+        )
+        return (await self.session.execute(stmt)).scalar_one_or_none()
+
+    async def has_active_session(self, user_id: int) -> bool:
+        return (await self.get_active_session(user_id)) is not None
+
+    async def has_completed_session(self, user_id: int) -> bool:
+        stmt = (
+            select(TestSession.id)
+            .where(TestSession.user_id == user_id, TestSession.is_completed.is_(True))
+            .limit(1)
+        )
+        return (await self.session.execute(stmt)).scalar_one_or_none() is not None
+
+    async def create_session(
+        self, user_id: int, question_ids: list[int]
+    ) -> TestSession:
+        session = TestSession(
+            user_id=user_id,
+            questions_json=json.dumps(question_ids),
+            total_questions=len(question_ids),
+            current_index=0,
+            started_at=datetime.utcnow(),
+        )
+        self.session.add(session)
+        await self.session.flush()
+        return session
+
+    async def get_session(self, session_id: int) -> TestSession | None:
+        return await self.session.get(TestSession, session_id)
+
+    async def advance_session(self, session_id: int, new_index: int) -> None:
+        await self.session.execute(
+            update(TestSession)
+            .where(TestSession.id == session_id)
+            .values(current_index=new_index)
+        )
+
+    async def add_score(self, session_id: int, delta: int) -> None:
+        await self.session.execute(
+            update(TestSession)
+            .where(TestSession.id == session_id)
+            .values(score=TestSession.score + delta)
+        )
+
+    async def complete_session(self, session_id: int) -> None:
+        await self.session.execute(
+            update(TestSession)
+            .where(TestSession.id == session_id)
+            .values(is_completed=True, completed_at=datetime.utcnow())
+        )
+
+    # --- Answers ---
+    async def save_answer(self, answer: TestAnswer) -> TestAnswer:
+        self.session.add(answer)
+        await self.session.flush()
+        return answer
+
+    async def answer_exists(self, session_id: int, question_index: int) -> bool:
+        stmt = (
+            select(TestAnswer.id)
+            .where(
+                TestAnswer.session_id == session_id,
+                TestAnswer.question_index == question_index,
+            )
+            .limit(1)
+        )
+        return (await self.session.execute(stmt)).scalar_one_or_none() is not None
+
+    # --- Poll map (native quiz mode only) ---
+    async def register_poll(
+        self,
+        poll_id: str,
+        session_id: int,
+        question_index: int,
+        correct_option_index: int,
+        options: list[str],
+    ) -> PollMap:
+        entry = PollMap(
+            poll_id=poll_id,
+            session_id=session_id,
+            question_index=question_index,
+            correct_option_index=correct_option_index,
+            options_json=json.dumps(options, ensure_ascii=False),
+        )
+        self.session.add(entry)
+        await self.session.flush()
+        return entry
+
+    async def resolve_poll(self, poll_id: str) -> PollMap | None:
+        stmt = select(PollMap).where(PollMap.poll_id == poll_id).limit(1)
+        return (await self.session.execute(stmt)).scalar_one_or_none()
+
+    async def delete_poll(self, poll_id: str) -> None:
+        entry = await self.resolve_poll(poll_id)
+        if entry:
+            await self.session.delete(entry)
+            await self.session.flush()
+
+    # --- Test questions shuffle helper ---
+    @staticmethod
+    def shuffle_question_options(
+        question: Question,
+    ) -> tuple[list[str], int]:
+        options = [
+            question.correct_answer,
+            question.answer_2,
+            question.answer_3,
+            question.answer_4,
+        ]
+        random.shuffle(options)
+        return options, options.index(question.correct_answer)

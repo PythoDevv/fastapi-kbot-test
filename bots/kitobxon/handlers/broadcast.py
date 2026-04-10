@@ -1,0 +1,64 @@
+from aiogram import Bot, F, Router
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Message
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from bots.kitobxon.keyboards import reply
+from bots.kitobxon.services import BroadcastService
+from bots.kitobxon.states import BroadcastStates
+from core.logging import get_logger
+
+logger = get_logger(__name__)
+router = Router(name="broadcast")
+
+
+@router.message(F.text == "📢 Broadcast")
+async def broadcast_start(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    from bots.kitobxon.repositories import UserRepository
+    user = await UserRepository(session).get_by_telegram_id(message.from_user.id)
+    if not user or not user.is_admin:
+        return
+    await state.set_state(BroadcastStates.waiting_message)
+    await message.answer(
+        "Broadcast uchun xabar yuboring:", reply_markup=reply.cancel_only()
+    )
+
+
+@router.message(BroadcastStates.waiting_message)
+async def broadcast_preview(
+    message: Message, state: FSMContext
+) -> None:
+    await state.update_data(broadcast_text=message.text or message.caption or "")
+    await state.set_state(BroadcastStates.waiting_confirmation)
+    await message.answer(
+        f"Quyidagi xabar yuboriladi:\n\n{message.text}\n\nTasdiqlaysizmi?",
+        reply_markup=reply.broadcast_confirm(),
+    )
+
+
+@router.message(BroadcastStates.waiting_confirmation, F.text == "✅ Yuborish")
+async def broadcast_confirm(
+    message: Message, state: FSMContext, session: AsyncSession, bot: Bot
+) -> None:
+    data = await state.get_data()
+    text = data.get("broadcast_text", "")
+    await state.clear()
+    status_msg = await message.answer(
+        "Broadcast boshlandi...", reply_markup=reply.admin_panel()
+    )
+    result = await BroadcastService(session).send_to_all(bot, text)
+    await status_msg.edit_text(
+        f"Broadcast yakunlandi!\n"
+        f"Jami: {result.total}\n"
+        f"Yuborildi: {result.sent}\n"
+        f"Xato: {result.failed}"
+    )
+
+
+@router.message(BroadcastStates.waiting_confirmation, F.text == "❌ Bekor qilish")
+async def broadcast_cancel(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await message.answer("Broadcast bekor qilindi.", reply_markup=reply.admin_panel())
