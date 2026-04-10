@@ -93,7 +93,10 @@ def questions_list_keyboard(questions) -> InlineKeyboardMarkup:
         for q in questions[:30]
     ]
     buttons.append(
-        [InlineKeyboardButton(text="➕ Savol qo'shish", callback_data="q_add")]
+        [
+            InlineKeyboardButton(text="➕ Savol qo'shish", callback_data="q_add"),
+            InlineKeyboardButton(text="📥 Excel yukla", callback_data="q_export"),
+        ]
     )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

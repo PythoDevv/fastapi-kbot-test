@@ -1,6 +1,6 @@
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Document, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, Document, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import inline, reply
@@ -28,6 +28,21 @@ async def questions_menu(message: Message, session: AsyncSession) -> None:
         f"Jami savollar: <b>{count}</b>",
         reply_markup=inline.questions_list_keyboard(questions),
     )
+
+
+@router.callback_query(F.data == "q_export")
+async def export_questions(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+    from bots.kitobxon.utils.excel import export_questions_to_excel
+    questions = await AdminService(session).list_questions()
+    buf = export_questions_to_excel(questions)
+    await cb.message.answer_document(
+        document=BufferedInputFile(buf.read(), filename="savollar.xlsx"),
+        caption=f"Jami: {len(questions)} savol",
+    )
+    await cb.answer()
 
 
 @router.callback_query(F.data.startswith("q_del:"))

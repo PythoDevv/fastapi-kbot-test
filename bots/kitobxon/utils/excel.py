@@ -52,6 +52,41 @@ def export_users_to_excel(users: list) -> io.BytesIO:
     return buf
 
 
+def export_questions_to_excel(questions: list) -> io.BytesIO:
+    """Export questions to Excel with columns: Question, Correct, Wrong1, Wrong2, Wrong3"""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Savollar"
+
+    headers = ["Savol", "To'g'ri javob", "Noto'g'ri 1", "Noto'g'ri 2", "Noto'g'ri 3"]
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(fill_type="solid", fgColor="2E4057")
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    ws.row_dimensions[1].height = 30
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+
+    for row_idx, q in enumerate(questions, 2):
+        ws.cell(row=row_idx, column=1, value=q.text or "")
+        ws.cell(row=row_idx, column=2, value=q.correct_answer or "")
+        ws.cell(row=row_idx, column=3, value=q.answer_2 or "")
+        ws.cell(row=row_idx, column=4, value=q.answer_3 or "")
+        ws.cell(row=row_idx, column=5, value=q.answer_4 or "")
+
+    col_widths = [50, 30, 30, 30, 30]
+    for col_idx, width in enumerate(col_widths, 1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
 def import_questions_from_excel(path: str) -> list[dict[str, Any]]:
     """
     Excel format:
