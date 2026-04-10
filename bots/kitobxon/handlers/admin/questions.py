@@ -1,11 +1,13 @@
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State
+from aiogram.filters import StateFilter
 from aiogram.types import BufferedInputFile, CallbackQuery, Document, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import inline, reply
 from bots.kitobxon.services import AdminService
-from bots.kitobxon.states import AdminQuestionStates
+from bots.kitobxon.states import AdminImportStates, AdminQuestionStates
 from core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -117,7 +119,11 @@ async def q_wrong3(
 
 
 # Excel import
-@router.message(F.document, F.document.mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+@router.message(
+    F.document,
+    F.document.mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ~StateFilter(AdminImportStates.waiting_users_file)
+)
 async def import_questions_excel(
     message: Message, session: AsyncSession, bot: Bot
 ) -> None:
