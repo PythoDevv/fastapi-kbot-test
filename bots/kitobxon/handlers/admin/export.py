@@ -70,6 +70,11 @@ async def import_users_file(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
     """Receive and process imported users file"""
+    if message.text == "Bekor qilish":
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=reply.admin_panel())
+        return
+
     if not message.document:
         await message.answer("Iltimos, Excel fayl yuboring (.xlsx):")
         return
