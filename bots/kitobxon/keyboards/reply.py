@@ -56,6 +56,14 @@ def admin_panel() -> ReplyKeyboardMarkup:
             ],
             [
                 KeyboardButton(text="⚙️ Test sozlamalari"),
+                KeyboardButton(text="📥 Excel yuklash"),
+            ],
+            [
+                KeyboardButton(text="👥 Adminlar"),
+                KeyboardButton(text="🗑 User o'chirish"),
+            ],
+            [
+                KeyboardButton(text="Userlarni import 📤"),
                 KeyboardButton(text="🏠 Asosiy menyu"),
             ],
         ],

@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from core.config import settings
 from core.database import AsyncSessionLocal
 from core.logging import get_logger
-from core.middleware import DbSessionMiddleware
+from core.middleware import DbSessionMiddleware, LoggingMiddleware
 
 logger = get_logger(__name__)
 
@@ -45,6 +45,7 @@ class BotRegistry:
             dp[key] = value
 
         dp.update.middleware(DbSessionMiddleware(AsyncSessionLocal))
+        dp.update.middleware(LoggingMiddleware())
         dp.include_router(config.router)
 
         self._bots[config.name] = (bot, dp, config)
@@ -83,24 +84,36 @@ class BotRegistry:
         )
 
     async def set_webhooks(self) -> None:
+        import asyncio
         for name, (bot, _dp, config) in self._bots.items():
             url = f"{settings.BASE_WEBHOOK_URL.rstrip('/')}{config.webhook_path}"
-            try:
-                await bot.set_webhook(
-                    url=url,
-                    secret_token=settings.WEBHOOK_SECRET,
-                    drop_pending_updates=False,
-                    allowed_updates=[
-                        "message",
-                        "callback_query",
-                        "poll_answer",
-                        "chat_join_request",
-                        "my_chat_member",
-                    ],
-                )
-                logger.info("Webhook set for '%s': %s", name, url)
-            except Exception:
-                logger.exception("Failed to set webhook for '%s'", name)
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    await bot.set_webhook(
+                        url=url,
+                        secret_token=settings.WEBHOOK_SECRET,
+                        drop_pending_updates=False,
+                        allowed_updates=[
+                            "message",
+                            "callback_query",
+                            "poll_answer",
+                            "chat_join_request",
+                            "my_chat_member",
+                        ],
+                    )
+                    logger.info("Webhook set for '%s': %s", name, url)
+                    break
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                        logger.warning(
+                            "Failed to set webhook for '%s' (attempt %d/%d), retrying in %ds...",
+                            name, attempt + 1, max_retries, wait_time
+                        )
+                        await asyncio.sleep(wait_time)
+                    else:
+                        logger.exception("Failed to set webhook for '%s' after %d attempts", name, max_retries)
 
     async def close_all(self) -> None:
         for name, (bot, _dp, _cfg) in self._bots.items():

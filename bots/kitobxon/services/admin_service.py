@@ -39,6 +39,14 @@ class AdminService:
             total_questions=await self.quiz.count_questions(),
         )
 
+    async def get_top_promoters(self, limit: int = 30) -> list[User]:
+        """Get top users by referral count"""
+        return await self.users.top_by_referrals(limit)
+
+    async def get_top_test_takers(self, limit: int = 30) -> list[User]:
+        """Get top users by score (who have solved test)"""
+        return await self.users.get_top_by_score_solved(limit)
+
     # --- Users ---
     async def find_user(self, telegram_id: int) -> User | None:
         return await self.users.get_by_telegram_id(telegram_id)
@@ -71,6 +79,54 @@ class AdminService:
 
     async def toggle_admin(self, target_telegram_id: int, is_admin: bool) -> None:
         await self.users.update_fields(target_telegram_id, is_admin=is_admin)
+
+    async def delete_user(self, target_telegram_id: int) -> None:
+        """Delete a user by telegram_id"""
+        await self.users.delete_by_telegram_id(target_telegram_id)
+
+    async def import_users(self, users_data: list[dict]) -> tuple[int, int, int]:
+        """Import users from excel data. Returns (updated, created, skipped)"""
+        updated = 0
+        created = 0
+        skipped = 0
+
+        for data in users_data:
+            telegram_id = data.get("telegram_id")
+            if not telegram_id:
+                skipped += 1
+                continue
+
+            user = await self.users.get_by_telegram_id(telegram_id)
+
+            if user:
+                # Update existing user
+                await self.users.update_fields(
+                    telegram_id,
+                    fio=data.get("fio") or user.fio,
+                    username=data.get("username") or user.username,
+                    mobile_number=data.get("mobile_number") or user.mobile_number,
+                    referrals_count=data.get("referrals_count", user.referrals_count),
+                    score=data.get("score", user.score),
+                    referred_by=data.get("referred_by") or user.referred_by,
+                )
+                updated += 1
+            else:
+                # Create new user
+                new_user = User(
+                    telegram_id=telegram_id,
+                    fio=data.get("fio"),
+                    username=data.get("username"),
+                    mobile_number=data.get("mobile_number"),
+                    referrals_count=data.get("referrals_count", 0),
+                    score=data.get("score", 0),
+                    referred_by=data.get("referred_by"),
+                    is_registered=True,
+                )
+                await self.users.add(new_user)
+                created += 1
+
+        await self.session.commit()
+        return updated, created, skipped
 
     async def reset_test(self, target_telegram_id: int) -> None:
         await self.users.update_fields(

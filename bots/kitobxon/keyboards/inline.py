@@ -119,5 +119,28 @@ def user_action_keyboard(telegram_id: int, is_admin: bool) -> InlineKeyboardMark
                     callback_data=f"u_admin:{telegram_id}",
                 )
             ],
+            [
+                InlineKeyboardButton(
+                    text="🗑 O'chirish",
+                    callback_data=f"u_delete:{telegram_id}",
+                )
+            ],
+        ]
+    )
+
+
+def admin_stats_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="📊 Targ'ibotchilar",
+                    callback_data="admin_top_promoters",
+                ),
+                InlineKeyboardButton(
+                    text="📝 Test ishlaganlar",
+                    callback_data="admin_top_test_takers",
+                ),
+            ]
         ]
     )

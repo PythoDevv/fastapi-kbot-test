@@ -78,3 +78,46 @@ def import_questions_from_excel(path: str) -> list[dict[str, Any]]:
             )
         )
     return questions
+
+
+def import_users_from_excel(path: str) -> list[dict[str, Any]]:
+    """
+    Excel format for importing users:
+    Column A: Telegram ID
+    Column B: FIO
+    Column C: Username
+    Column D: Mobile number
+    Column E: Referrals count
+    Column F: Score
+    Column G: Referred by (user ID)
+    """
+    wb = openpyxl.load_workbook(path)
+    ws = wb.active
+    users = []
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if not row or not row[0]:  # Skip empty rows
+            continue
+        try:
+            telegram_id = int(row[0]) if row[0] else None
+            fio = str(row[1]).strip() if row[1] else None
+            username = str(row[2]).strip() if row[2] else None
+            mobile_number = str(row[3]).strip() if row[3] else None
+            referrals_count = int(row[4]) if row[4] else 0
+            score = int(row[5]) if row[5] else 0
+            referred_by = int(row[6]) if row[6] else None
+
+            if not telegram_id:
+                continue
+
+            users.append({
+                "telegram_id": telegram_id,
+                "fio": fio,
+                "username": username,
+                "mobile_number": mobile_number,
+                "referrals_count": referrals_count,
+                "score": score,
+                "referred_by": referred_by,
+            })
+        except (ValueError, IndexError):
+            continue
+    return users

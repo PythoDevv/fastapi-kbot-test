@@ -11,6 +11,7 @@ from bots.kitobxon.handlers import (
     subs,
 )
 from bots.kitobxon.handlers.admin import (
+    admins,
     channels,
     export,
     panel,
@@ -54,6 +55,7 @@ def build_router() -> Router:
     # Admin sub-routers
     root.include_router(panel.router)
     root.include_router(users.router)
+    root.include_router(admins.router)
     root.include_router(channels.router)
     root.include_router(questions.router)
     root.include_router(settings.router)

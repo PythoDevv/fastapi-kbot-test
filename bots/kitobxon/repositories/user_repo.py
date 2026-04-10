@@ -1,4 +1,4 @@
-from sqlalchemy import desc, select, update
+from sqlalchemy import delete, desc, select, update
 
 from bots.kitobxon.models import User
 from bots.kitobxon.repositories.base import BaseRepository
@@ -69,3 +69,19 @@ class UserRepository(BaseRepository[User]):
 
     async def count_solved(self) -> int:
         return await self.count(test_solved=True)
+
+    async def get_top_by_score_solved(self, limit: int = 30) -> list[User]:
+        """Get top users by score who have solved the test"""
+        stmt = (
+            select(User)
+            .where(User.test_solved.is_(True))
+            .order_by(desc(User.score), User.id)
+            .limit(limit)
+        )
+        return list((await self.session.execute(stmt)).scalars().all())
+
+    async def delete_by_telegram_id(self, telegram_id: int) -> None:
+        """Delete a user by telegram_id"""
+        await self.session.execute(
+            delete(User).where(User.telegram_id == telegram_id)
+        )

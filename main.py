@@ -4,8 +4,9 @@ import uvicorn
 from fastapi import FastAPI
 
 from bots.kitobxon.handlers.router import build_router as build_kitobxon_router
+from core.admin_init import initialize_admins
 from core.config import settings
-from core.database import dispose_engine
+from core.database import AsyncSessionLocal, dispose_engine
 from core.logging import get_logger, setup_logging
 from core.registry import BotConfig, BotRegistry
 
@@ -42,6 +43,11 @@ async def lifespan(app: FastAPI):
     # ))
 
     await registry.set_webhooks()
+
+    # Initialize admin users
+    async with AsyncSessionLocal() as session:
+        await initialize_admins(session, settings.KITOBXON_ADMIN_IDS)
+
     logger.info("All webhooks set. Ready.")
 
     yield
@@ -72,5 +78,5 @@ if __name__ == "__main__":
         host=settings.SERVER_HOST,
         port=settings.SERVER_PORT,
         workers=1,
-        reload=False,
+        reload=True,
     )

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import inline, reply
 from bots.kitobxon.services import AdminService
-from bots.kitobxon.states import AdminScoreStates
+from bots.kitobxon.states import AdminScoreStates, AdminUserSearchStates
 
 router = Router(name="admin_users")
 
@@ -17,13 +17,46 @@ async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
 
 
 @router.message(F.text == "👥 Foydalanuvchilar")
-async def users_menu(message: Message, session: AsyncSession) -> None:
+async def users_menu(message: Message, state: FSMContext, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
+    await state.set_state(AdminUserSearchStates.waiting_user_id)
     await message.answer(
         "Foydalanuvchi ID sini yuboring (Telegram ID):",
         reply_markup=reply.cancel_only(),
     )
+
+
+@router.message(AdminUserSearchStates.waiting_user_id)
+async def search_user(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    try:
+        telegram_id = int(message.text.strip())
+    except ValueError:
+        await message.answer("Iltimos, to'g'ri ID kiriting (faqat raqamlar):")
+        return
+
+    from bots.kitobxon.repositories import UserRepository
+    user = await UserRepository(session).get_by_telegram_id(telegram_id)
+
+    await state.clear()
+
+    if not user:
+        await message.answer("Foydalanuvchi topilmadi.")
+        return
+
+    # Show user info and action buttons
+    info = f"<b>👤 Foydalanuvchi:</b>\n"
+    info += f"ID: <code>{user.telegram_id}</code>\n"
+    info += f"Ism: {user.fio or '-'}\n"
+    info += f"Username: @{user.username or '-'}\n"
+    info += f"Ball: <b>{user.score}</b>\n"
+    info += f"Referallar: <b>{user.referrals_count}</b>\n"
+    admin_status = "✅ Ha" if user.is_admin else "❌ Yoq"
+    info += f"Admin: {admin_status}"
+
+    await message.answer(info, reply_markup=inline.user_action_keyboard(telegram_id, user.is_admin))
 
 
 @router.callback_query(F.data.startswith("u_score:"))
@@ -111,3 +144,50 @@ async def toggle_admin_status(cb: CallbackQuery, session: AsyncSession) -> None:
     await AdminService(session).toggle_admin(target_id, new_status)
     status_text = "Admin qilindi" if new_status else "Admin olib tashlandi"
     await cb.answer(f"{target.fio}: {status_text}", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("u_delete:"))
+async def delete_user_confirm(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+    target_id = int(cb.data.split(":")[1])
+    from bots.kitobxon.repositories import UserRepository
+    target = await UserRepository(session).get_by_telegram_id(target_id)
+    if not target:
+        await cb.answer("Foydalanuvchi topilmadi.", show_alert=True)
+        return
+
+    # Send confirmation keyboard
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+    confirm_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Ha, o'chirish", callback_data=f"confirm_delete_user:{target_id}"),
+                InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel_delete"),
+            ]
+        ]
+    )
+    user_name = target.fio or "Nomi noma'lum"
+    await cb.message.answer(
+        f"<b>⚠️ Ogohlantirish!</b>\n\nFoydalanuvchini o'chirilsinmi?\n{user_name} (ID: {target_id})",
+        reply_markup=confirm_kb,
+    )
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("confirm_delete_user:"))
+async def confirm_delete_user(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+    target_id = int(cb.data.split(":")[1])
+    await AdminService(session).delete_user(target_id)
+    await cb.message.delete()
+    await cb.answer("Foydalanuvchi o'chirildi ✅", show_alert=True)
+
+
+@router.callback_query(F.data == "cancel_delete")
+async def cancel_delete(cb: CallbackQuery) -> None:
+    await cb.message.delete()
+    await cb.answer()

@@ -46,3 +46,20 @@ class AdminScoreStates(StatesGroup):
     waiting_user_id = State()
     waiting_new_score = State()
     waiting_reason = State()
+
+
+class AdminUserSearchStates(StatesGroup):
+    waiting_user_id = State()
+
+
+class AdminAdminStates(StatesGroup):
+    waiting_id = State()
+
+
+class AdminImportStates(StatesGroup):
+    waiting_users_file = State()
+
+
+class AdminExportStates(StatesGroup):
+    waiting_referral_id = State()
+    waiting_answers_id = State()
