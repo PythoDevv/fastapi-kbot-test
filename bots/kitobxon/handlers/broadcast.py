@@ -31,10 +31,18 @@ async def broadcast_start(
 async def broadcast_preview(
     message: Message, state: FSMContext
 ) -> None:
-    await state.update_data(broadcast_text=message.text or message.caption or "")
+    # Store message type and details for broadcasting
+    await state.update_data(
+        message_type="text",
+        message_id=message.message_id,
+        chat_id=message.chat.id,
+        message_text=message.text or message.caption or "",
+    )
     await state.set_state(BroadcastStates.waiting_confirmation)
+
+    preview_text = message.text or message.caption or "[Stiker yoki boshqa kontentli xabar]"
     await message.answer(
-        f"Quyidagi xabar yuboriladi:\n\n{message.text}\n\nTasdiqlaysizmi?",
+        f"Quyidagi xabar yuboriladi:\n\n{preview_text}\n\nTasdiqlaysizmi?",
         reply_markup=reply.broadcast_confirm(),
     )
 
@@ -44,12 +52,16 @@ async def broadcast_confirm(
     message: Message, state: FSMContext, session: AsyncSession, bot: Bot
 ) -> None:
     data = await state.get_data()
-    text = data.get("broadcast_text", "")
+    original_message_id = data.get("message_id")
+    original_chat_id = data.get("chat_id")
     await state.clear()
+
     status_msg = await message.answer(
         "Broadcast boshlandi...", reply_markup=reply.admin_panel()
     )
-    result = await BroadcastService(session).send_to_all(bot, text)
+    result = await BroadcastService(session).send_to_all(
+        bot, original_chat_id, original_message_id
+    )
     await status_msg.edit_text(
         f"Broadcast yakunlandi!\n"
         f"Jami: {result.total}\n"

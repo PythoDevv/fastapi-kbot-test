@@ -25,18 +25,25 @@ class BroadcastService:
         self.session = session
         self.users = UserRepository(session)
 
-    async def send_to_all(self, bot: Bot, text: str) -> BroadcastResult:
+    async def send_to_all(
+        self, bot: Bot, source_chat_id: int, message_id: int
+    ) -> BroadcastResult:
+        """Copy message to all registered users (preserves formatting, stickers, etc.)"""
         user_ids = await self.users.all_registered_ids()
         sent = failed = 0
         for tg_id in user_ids:
             try:
-                await bot.send_message(chat_id=tg_id, text=text)
+                await bot.copy_message(
+                    chat_id=tg_id, from_chat_id=source_chat_id, message_id=message_id
+                )
                 sent += 1
             except TelegramRetryAfter as e:
                 logger.warning("Broadcast flood wait %ds", e.retry_after)
                 await asyncio.sleep(e.retry_after)
                 try:
-                    await bot.send_message(chat_id=tg_id, text=text)
+                    await bot.copy_message(
+                        chat_id=tg_id, from_chat_id=source_chat_id, message_id=message_id
+                    )
                     sent += 1
                 except Exception:
                     failed += 1
