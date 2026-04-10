@@ -105,7 +105,11 @@ def user_action_keyboard(telegram_id: int, is_admin: bool) -> InlineKeyboardMark
                 InlineKeyboardButton(
                     text="💯 Ball o'zgartirish",
                     callback_data=f"u_score:{telegram_id}",
-                )
+                ),
+                InlineKeyboardButton(
+                    text="👥 Referallar",
+                    callback_data=f"u_referrals:{telegram_id}",
+                ),
             ],
             [
                 InlineKeyboardButton(

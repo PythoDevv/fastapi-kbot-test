@@ -77,6 +77,32 @@ class AdminService:
         user.score = new_score
         return user
 
+    async def set_referral_count(
+        self,
+        admin_telegram_id: int,
+        admin_fio: str | None,
+        target_telegram_id: int,
+        new_count: int,
+        reason: str | None,
+    ) -> User:
+        user = await self.users.get_by_telegram_id(target_telegram_id)
+        if user is None:
+            from bots.kitobxon.exceptions import UserNotFoundError
+            raise UserNotFoundError(target_telegram_id)
+        old_count = user.referrals_count
+        await self.users.update_fields(target_telegram_id, referrals_count=new_count)
+        await self.score_log.log(
+            admin_telegram_id=admin_telegram_id,
+            admin_fio=admin_fio,
+            target_telegram_id=target_telegram_id,
+            target_fio=user.fio,
+            old_score=old_count,
+            new_score=new_count,
+            reason=f"Referallar: {reason}" if reason else "Referallar o'zgartirildi",
+        )
+        user.referrals_count = new_count
+        return user
+
     async def toggle_admin(self, target_telegram_id: int, is_admin: bool) -> None:
         await self.users.update_fields(target_telegram_id, is_admin=is_admin)
 

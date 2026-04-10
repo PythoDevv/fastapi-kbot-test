@@ -63,3 +63,8 @@ class AdminImportStates(StatesGroup):
 class AdminExportStates(StatesGroup):
     waiting_referral_id = State()
     waiting_answers_id = State()
+
+
+class AdminReferralStates(StatesGroup):
+    waiting_new_count = State()
+    waiting_reason = State()

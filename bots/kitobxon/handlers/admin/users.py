@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import inline, reply
 from bots.kitobxon.services import AdminService
-from bots.kitobxon.states import AdminScoreStates, AdminUserSearchStates
+from bots.kitobxon.states import AdminReferralStates, AdminScoreStates, AdminUserSearchStates
 
 router = Router(name="admin_users")
 
@@ -115,6 +115,65 @@ async def set_score_reason(
     await state.clear()
     await message.answer(
         f"Ball o'zgartirildi.\n{user.fio} → {user.score} ball",
+        reply_markup=reply.admin_panel(),
+    )
+
+
+@router.callback_query(F.data.startswith("u_referrals:"))
+async def start_referral_change(
+    cb: CallbackQuery, state: FSMContext, session: AsyncSession
+) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+    target_id = int(cb.data.split(":")[1])
+    await state.set_state(AdminReferralStates.waiting_new_count)
+    await state.update_data(target_telegram_id=target_id)
+    await cb.message.answer(
+        f"ID {target_id} uchun yangi referallar sonini kiriting:", reply_markup=reply.cancel_only()
+    )
+    await cb.answer()
+
+
+@router.message(AdminReferralStates.waiting_new_count)
+async def set_referral_count(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    try:
+        new_count = int(message.text.strip())
+    except ValueError:
+        await message.answer("Iltimos, son kiriting:")
+        return
+
+    data = await state.get_data()
+    target_id = data["target_telegram_id"]
+
+    await state.set_state(AdminReferralStates.waiting_reason)
+    await state.update_data(new_count=new_count)
+    await message.answer(
+        f"Referallar: {new_count}. Sabab kiriting (yoki — yuborish uchun \"-\"):",
+        reply_markup=reply.cancel_only(),
+    )
+
+
+@router.message(AdminReferralStates.waiting_reason)
+async def set_referral_reason(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    data = await state.get_data()
+    reason = message.text.strip() if message.text.strip() != "-" else None
+    service = AdminService(session)
+    caller = await service.find_user(message.from_user.id)
+    user = await service.set_referral_count(
+        admin_telegram_id=message.from_user.id,
+        admin_fio=caller.fio if caller else None,
+        target_telegram_id=data["target_telegram_id"],
+        new_count=data["new_count"],
+        reason=reason,
+    )
+    await state.clear()
+    await message.answer(
+        f"Referallar o'zgartirildi.\n{user.fio} → {user.referrals_count} referallar",
         reply_markup=reply.admin_panel(),
     )
 
