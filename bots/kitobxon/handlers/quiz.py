@@ -53,6 +53,20 @@ async def start_quiz(
         )
         return
 
+    # Award referral bonus if user was referred and hasn't received bonus yet
+    if (
+        user.referred_by
+        and not user.referral_bonus_awarded
+    ):
+        referrer = await user_repo.get_by_telegram_id(user.referred_by)
+        if referrer:
+            # Award 1 point to referrer
+            await user_repo.increment_score(referrer.id, 1)
+            # Mark that bonus was awarded
+            await user_repo.update_fields(
+                message.from_user.id, referral_bonus_awarded=True
+            )
+
     service = QuizService(session)
     try:
         result = await service.start_session(message.from_user.id)

@@ -198,6 +198,8 @@ def import_questions_from_excel(path: str) -> tuple[list[dict[str, Any]], list[s
 def import_users_from_excel(path: str) -> tuple[list[dict[str, Any]], list[str]]:
     """
     Excel/CSV format for importing users:
+
+    Standard format (columns A-G):
     Column A: Telegram ID
     Column B: FIO
     Column C: Username
@@ -206,11 +208,24 @@ def import_users_from_excel(path: str) -> tuple[list[dict[str, Any]], list[str]]
     Column F: Score
     Column G: Referred by (user ID)
 
+    CSV format (columns A-J):
+    Column A: ID
+    Column B: FIO
+    Column C: Username
+    Column D: Telefon
+    Column E: Referallar
+    Column F: Ball
+    Column G: Javoblar
+    Column H: Kim taklif qildi (ID)
+    Column I: Telegram ID raqami
+    Column J: Qo'shilgan vaqti
+
     Returns: (users_list, errors_list)
     """
     users = []
     errors = []
     rows = []
+    is_csv_format = False
 
     try:
         if path.endswith('.xlsx'):
@@ -221,7 +236,13 @@ def import_users_from_excel(path: str) -> tuple[list[dict[str, Any]], list[str]]
         elif path.endswith('.csv'):
             with open(path, 'r', encoding='utf-8') as f:
                 reader = csv.reader(f)
-                next(reader, None)  # Skip header
+                header = next(reader, None)  # Read header
+                # Detect format based on header
+                if header and len(header) > 8:
+                    header_lower = [h.lower() if h else "" for h in header]
+                    # Check if it's CSV format by looking for specific columns
+                    if any("telegram" in h for h in header_lower):
+                        is_csv_format = True
                 for row in reader:
                     rows.append(row)
         else:
@@ -236,18 +257,35 @@ def import_users_from_excel(path: str) -> tuple[list[dict[str, Any]], list[str]]
             continue
 
         try:
-            tid_raw = row[0] if len(row) > 0 else None
+            if is_csv_format:
+                # CSV format: Telegram ID is in column I (index 8)
+                tid_raw = row[8] if len(row) > 8 else row[0]  # Fallback to column A
+            else:
+                # Standard format: Telegram ID is in column A (index 0)
+                tid_raw = row[0] if len(row) > 0 else None
+
             if not tid_raw or str(tid_raw).strip() == "":
                 errors.append(f"Qator {row_idx}: Telegram ID yo'q.")
                 continue
 
             telegram_id = int(float(str(tid_raw).strip()))
-            fio = str(row[1]).strip() if len(row) > 1 and row[1] else None
-            username = str(row[2]).strip() if len(row) > 2 and row[2] else None
-            mobile_number = str(row[3]).strip() if len(row) > 3 and row[3] else None
-            referrals_count = int(float(str(row[4]).strip())) if len(row) > 4 and row[4] else 0
-            score = int(float(str(row[5]).strip())) if len(row) > 5 and row[5] else 0
-            referred_by = int(float(str(row[6]).strip())) if len(row) > 6 and row[6] else None
+
+            if is_csv_format:
+                # CSV format mapping
+                fio = str(row[1]).strip() if len(row) > 1 and row[1] else None
+                username = str(row[2]).strip() if len(row) > 2 and row[2] else None
+                mobile_number = str(row[3]).strip() if len(row) > 3 and row[3] else None
+                referrals_count = int(float(str(row[4]).strip())) if len(row) > 4 and row[4] else 0
+                score = int(float(str(row[5]).strip())) if len(row) > 5 and row[5] else 0
+                referred_by = int(float(str(row[7]).strip())) if len(row) > 7 and row[7] else None
+            else:
+                # Standard format mapping
+                fio = str(row[1]).strip() if len(row) > 1 and row[1] else None
+                username = str(row[2]).strip() if len(row) > 2 and row[2] else None
+                mobile_number = str(row[3]).strip() if len(row) > 3 and row[3] else None
+                referrals_count = int(float(str(row[4]).strip())) if len(row) > 4 and row[4] else 0
+                score = int(float(str(row[5]).strip())) if len(row) > 5 and row[5] else 0
+                referred_by = int(float(str(row[6]).strip())) if len(row) > 6 and row[6] else None
 
             users.append({
                 "telegram_id": telegram_id,

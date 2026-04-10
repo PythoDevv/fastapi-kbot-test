@@ -13,6 +13,7 @@ from bots.kitobxon.handlers import (
 from bots.kitobxon.handlers.admin import (
     admins,
     channels,
+    content,
     export,
     panel,
     questions,
@@ -59,6 +60,7 @@ def build_router() -> Router:
     root.include_router(channels.router)
     root.include_router(questions.router)
     root.include_router(settings.router)
+    root.include_router(content.router)
     root.include_router(export.router)
     root.include_router(broadcast.router)
 

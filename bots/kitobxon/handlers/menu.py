@@ -46,10 +46,33 @@ async def referral_link(message: Message, session: AsyncSession) -> None:
     user_repo = UserRepository(session)
     user = await user_repo.get_by_telegram_id(message.from_user.id)
     count = user.referrals_count if user else 0
-    await message.answer(
-        f"Referal havolangiz:\n{link}\n\n"
-        f"Siz taklif qilgan do'stlar soni: <b>{count}</b>"
-    )
+
+    # Get custom referral content if exists
+    content_repo = ContentRepository(session)
+    content = await content_repo.get_by_key("referral")
+
+    # Build message
+    text_parts = []
+
+    # Add custom content text if exists
+    if content and content.text:
+        text_parts.append(content.text)
+
+    # Add referral link if content requires it or if no content exists
+    should_show_link = (not content) or content.require_link
+    if should_show_link:
+        text_parts.append(f"Referal havolangiz:\n{link}")
+
+    # Add referral count
+    text_parts.append(f"\nSiz taklif qilgan do'stlar soni: <b>{count}</b>")
+
+    final_text = "\n\n".join(text_parts)
+
+    # Send with or without photo based on content.image_id
+    if content and content.image_id:
+        await message.answer_photo(photo=content.image_id, caption=final_text)
+    else:
+        await message.answer(final_text)
 
 
 @router.message(F.text == "📝 Tanlov shartlari")

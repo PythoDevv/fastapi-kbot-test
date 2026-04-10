@@ -9,7 +9,8 @@
       "Bash(python3 -m py_compile bots/kitobxon/utils/excel.py bots/kitobxon/states.py bots/kitobxon/keyboards/inline.py bots/kitobxon/handlers/admin/questions.py bots/kitobxon/handlers/admin/export.py)",
       "Bash(git commit -m 'feat: improve import/export with CSV support and better error messages:*)",
       "Bash(python3 -m py_compile bots/kitobxon/keyboards/reply.py bots/kitobxon/handlers/broadcast.py bots/kitobxon/services/broadcast_service.py)",
-      "Bash(git commit -m 'feat: remove delete user button, enhance broadcast for any content type:*)"
+      "Bash(git commit -m 'feat: remove delete user button, enhance broadcast for any content type:*)",
+      "Read(//home/ilyos/Downloads/Telegram Desktop/**)"
     ]
   }
 }

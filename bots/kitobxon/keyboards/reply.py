@@ -63,6 +63,9 @@ def admin_panel() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="Userlarni import 📤"),
             ],
             [
+                KeyboardButton(text="📝 Kontentlar"),
+            ],
+            [
                 KeyboardButton(text="🏠 Asosiy menyu"),
             ],
         ],

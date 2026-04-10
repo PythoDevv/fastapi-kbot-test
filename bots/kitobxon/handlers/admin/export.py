@@ -45,22 +45,33 @@ async def export_users(message: Message, session: AsyncSession) -> None:
 async def start_users_import(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
-    """Start users import from Excel"""
+    """Start users import from Excel or CSV"""
     if not await _is_admin(session, message.from_user.id):
         return
 
     await state.set_state(AdminImportStates.waiting_users_file)
     await message.answer(
-        "<b>📥 Excel fayldagi foydalanuvchilarni import qilish</b>\n\n"
-        "Format:\n"
-        "Column A: Telegram ID\n"
-        "Column B: FIO\n"
-        "Column C: Username\n"
-        "Column D: Telefon raqam\n"
-        "Column E: Referallar soni\n"
-        "Column F: Ball\n"
-        "Column G: Kim taklif qildi (User ID)\n\n"
-        "Excel faylini yuboring:",
+        "<b>📥 Excel/CSV fayldagi foydalanuvchilarni import qilish</b>\n\n"
+        "<b>Qabul qilingan formatlar:</b>\n"
+        "📊 Excel format (.xlsx):\n"
+        "  Column A: Telegram ID\n"
+        "  Column B: FIO\n"
+        "  Column C: Username\n"
+        "  Column D: Telefon\n"
+        "  Column E: Referallar\n"
+        "  Column F: Ball\n"
+        "  Column G: Kim taklif qildi\n\n"
+        "📋 CSV format:\n"
+        "  Column A: ID\n"
+        "  Column B: FIO\n"
+        "  Column C: Username\n"
+        "  Column D: Telefon\n"
+        "  Column E: Referallar\n"
+        "  Column F: Ball\n"
+        "  Column G: Javoblar\n"
+        "  Column H: Kim taklif qildi (ID)\n"
+        "  Column I: Telegram ID raqami\n\n"
+        "Excel yoki CSV faylini yuboring:",
         reply_markup=reply.cancel_only(),
     )
 
@@ -76,14 +87,21 @@ async def import_users_file(
         return
 
     if not message.document:
-        await message.answer("Iltimos, Excel fayl yuboring (.xlsx):")
+        await message.answer("Iltimos, Excel (.xlsx) yoki CSV (.csv) fayl yuboring:")
         return
 
     doc: Document = message.document
 
+    # Check file extension
+    file_name = doc.file_name or ""
+    if not (file_name.endswith('.xlsx') or file_name.endswith('.csv')):
+        await message.answer("❌ Fayl formati noto'g'ri.\nFaqat .xlsx yoki .csv fayllar qabul qilinadi.")
+        return
+
     # Download file
     file = await message.bot.get_file(doc.file_id)
-    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+    file_ext = ".xlsx" if file_name.endswith('.xlsx') else ".csv"
+    with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
         await message.bot.download_file(file.file_path, tmp)
         tmp_path = tmp.name
 

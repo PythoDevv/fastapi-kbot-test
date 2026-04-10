@@ -42,6 +42,7 @@ class User(Base, TimestampMixin):
     score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     referrals_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     referred_by: Mapped[int | None] = mapped_column(BigInteger, index=True)
+    referral_bonus_awarded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     test_solved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     certificate_received: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False

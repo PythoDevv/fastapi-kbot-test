@@ -157,3 +157,28 @@ def admin_stats_keyboard() -> InlineKeyboardMarkup:
             ]
         ]
     )
+
+
+def content_list_keyboard() -> InlineKeyboardMarkup:
+    """Keyboard with content items to manage"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="📝 Tanlov shartlari", callback_data="ct_manage:nizom")],
+            [InlineKeyboardButton(text="🎁 Viktorina sovg'alari", callback_data="ct_manage:prizes")],
+            [InlineKeyboardButton(text="💠 Do'stlarni taklif qilish", callback_data="ct_manage:referral")],
+        ]
+    )
+
+
+def content_manage_keyboard(key: str, require_link: bool = False) -> InlineKeyboardMarkup:
+    """Management keyboard for a specific content item"""
+    link_text = f"🔗 Link {'✅' if require_link else '❌'}"
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✏️ Tahrirlash", callback_data=f"ct_edit:{key}"),
+                InlineKeyboardButton(text="🗑 O'chirish", callback_data=f"ct_delete:{key}"),
+            ],
+            [InlineKeyboardButton(text=link_text, callback_data=f"ct_link:{key}")],
+        ]
+    )
