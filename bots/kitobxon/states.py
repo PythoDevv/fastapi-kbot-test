@@ -40,6 +40,7 @@ class AdminQuestionStates(StatesGroup):
     waiting_wrong_1 = State()
     waiting_wrong_2 = State()
     waiting_wrong_3 = State()
+    waiting_confirmation = State()
 
 
 class AdminQuestionImportStates(StatesGroup):

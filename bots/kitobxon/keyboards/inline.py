@@ -82,6 +82,19 @@ def quiz_type_keyboard(current_type: str) -> InlineKeyboardMarkup:
     )
 
 
+def quiz_status_keyboard(is_active: bool, is_waiting: bool, is_finished: bool) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="⏸ To'xtatish" if is_active or is_finished else "▶️ Boshlash",
+                    callback_data="qs_toggle",
+                ),
+            ]
+        ]
+    )
+
+
 def questions_list_keyboard(questions) -> InlineKeyboardMarkup:
     buttons = [
         [

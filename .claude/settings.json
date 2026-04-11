@@ -11,7 +11,18 @@
       "Bash(python3 -m py_compile bots/kitobxon/keyboards/reply.py bots/kitobxon/handlers/broadcast.py bots/kitobxon/services/broadcast_service.py)",
       "Bash(git commit -m 'feat: remove delete user button, enhance broadcast for any content type:*)",
       "Read(//home/ilyos/Downloads/Telegram Desktop/**)",
-      "Bash(git commit -m ':*)"
+      "Bash(git commit -m ':*)",
+      "Bash(grep -E \"^-.*\\\\.py$\")",
+      "Bash(python3 main.py)",
+      "Bash(pip install:*)",
+      "Bash(curl -s http://localhost:8077/health)",
+      "Bash(timeout 2 curl -v http://localhost:8077/health)",
+      "Bash(pkill -f \"python3 main.py\")",
+      "Bash(ls -la /home/ilyos/bots/kbot_and_test_solve/.env*)",
+      "Read(//tmp/**)",
+      "Bash(pkill -9 -f \"python3 main.py\")",
+      "Bash(netstat -tlnp)",
+      "Bash(grep -n \"Natijalar\\\\|results\\\\|stats\" /home/ilyos/bots/kbot_and_test_solve/bots/kitobxon/handlers/*.py)"
     ]
   }
 }

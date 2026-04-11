@@ -80,3 +80,12 @@ def broadcast_confirm() -> ReplyKeyboardMarkup:
         ],
         resize_keyboard=True,
     )
+
+
+def confirm_action() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="✅ Qo'shish"), KeyboardButton(text="❌ Bekor qilish")],
+        ],
+        resize_keyboard=True,
+    )

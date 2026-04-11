@@ -30,7 +30,32 @@ async def show_settings(message: Message, session: AsyncSession) -> None:
         f"Savollar: {s.questions_per_test}\n"
         f"O'tish bali: {s.limit_score}\n"
         f"Vaqt: {s.time_limit_seconds}s",
-        reply_markup=inline.quiz_type_keyboard(s.quiz_type.value),
+        reply_markup=inline.quiz_status_keyboard(s.active, s.waiting, s.finished),
+    )
+
+
+@router.callback_query(F.data == "qs_toggle")
+async def toggle_quiz_status(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+    service = AdminService(session)
+    s = await service.get_settings()
+
+    if s.finished:
+        await cb.answer("Test yakunlangan. Qayta faollantirish mumkin emas.", show_alert=True)
+        return
+
+    if s.active:
+        await service.set_quiz_waiting(True)
+        await cb.answer("Test to'xtatildi (waiting mode).")
+    else:
+        await service.set_quiz_waiting(False)
+        await cb.answer("Test faollashtirildi ✅")
+
+    s = await service.get_settings()
+    await cb.message.edit_reply_markup(
+        reply_markup=inline.quiz_status_keyboard(s.active, s.waiting, s.finished)
     )
 
 
