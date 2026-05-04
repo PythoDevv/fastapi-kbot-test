@@ -234,3 +234,12 @@ def quiz_settings_full_keyboard(is_active: bool, is_waiting: bool, is_finished: 
             ]
         ]
     )
+
+
+def cancel_keyboard() -> InlineKeyboardMarkup:
+    """Simple cancel button for inline keyboards (used with edit_text)"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Bekor qilish", callback_data="cancel")]
+        ]
+    )

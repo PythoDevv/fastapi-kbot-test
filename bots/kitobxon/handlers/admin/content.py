@@ -84,7 +84,7 @@ async def start_edit_content(cb: CallbackQuery, state: FSMContext, session: Asyn
         "&lt;b&gt;Qalin matn&lt;/b&gt;\n"
         "&lt;i&gt;Kursiv matn&lt;/i&gt;\n"
         "&lt;u&gt;Pastga chizilgan&lt;/u&gt;",
-        reply_markup=reply.cancel_only(),
+        reply_markup=inline.cancel_keyboard(),
     )
     await cb.answer()
 
@@ -179,6 +179,17 @@ async def delete_content(cb: CallbackQuery, session: AsyncSession) -> None:
         "<b>📝 Kontentlar Boshqaruvi</b>\n\nTahrirlaydigan kontentni tanlang:",
         reply_markup=inline.content_list_keyboard(),
     )
+
+
+@router.callback_query(F.data == "cancel")
+async def cancel_edit_content(cb: CallbackQuery, state: FSMContext) -> None:
+    """Handle cancel button during content editing"""
+    await state.clear()
+    await cb.message.edit_text(
+        "<b>📝 Kontentlar Boshqaruvi</b>\n\nTahrirlaydigan kontentni tanlang:",
+        reply_markup=inline.content_list_keyboard(),
+    )
+    await cb.answer("Bekor qilindi.")
 
 
 @router.callback_query(F.data.startswith("ct_link:"))
