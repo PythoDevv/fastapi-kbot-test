@@ -22,7 +22,26 @@
       "Read(//tmp/**)",
       "Bash(pkill -9 -f \"python3 main.py\")",
       "Bash(netstat -tlnp)",
-      "Bash(grep -n \"Natijalar\\\\|results\\\\|stats\" /home/ilyos/bots/kbot_and_test_solve/bots/kitobxon/handlers/*.py)"
+      "Bash(grep -n \"Natijalar\\\\|results\\\\|stats\" /home/ilyos/bots/kbot_and_test_solve/bots/kitobxon/handlers/*.py)",
+      "Bash(python3 -m py_compile bots/kitobxon/handlers/quiz.py)",
+      "Bash(python3 -m py_compile bots/kitobxon/repositories/quiz_repo.py bots/kitobxon/services/results_service.py bots/kitobxon/keyboards/inline.py bots/kitobxon/handlers/results.py)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(kill %1)",
+      "Bash(python3 -c \"from bots.kitobxon.handlers.auth import router; print\\('auth handler OK'\\)\")",
+      "Bash(python -m alembic upgrade head)",
+      "Bash(python3 -m alembic upgrade head)",
+      "Bash(alembic upgrade:*)",
+      "Bash(./venv/bin/pip install:*)",
+      "Bash(./venv/bin/python3 main.py)",
+      "Bash(pkill -f \"python3 main.py\" sleep 2 ./venv/bin/python3 main.py)",
+      "Bash(jobs)",
+      "Read(//home/ilyos/bots/kitobxon/handlers/**)",
+      "Bash(pkill -f \"python.*main.py\")",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs -r kill -9 echo \"Done\")"
+    ],
+    "additionalDirectories": [
+      "/tmp"
     ]
   }
 }

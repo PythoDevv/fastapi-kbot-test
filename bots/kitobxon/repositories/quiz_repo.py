@@ -124,10 +124,29 @@ class QuizRepository(BaseRepository[Question]):
         )
         return (await self.session.execute(stmt)).scalar_one_or_none() is not None
 
+    async def get_completed_session(self, user_id: int) -> TestSession | None:
+        stmt = (
+            select(TestSession)
+            .where(TestSession.user_id == user_id, TestSession.is_completed.is_(True))
+            .order_by(TestSession.id.desc())
+            .limit(1)
+        )
+        return (await self.session.execute(stmt)).scalar_one_or_none()
+
+    async def get_session_answers(self, session_id: int) -> list[TestAnswer]:
+        stmt = (
+            select(TestAnswer)
+            .where(TestAnswer.session_id == session_id)
+            .order_by(TestAnswer.question_index)
+        )
+        return list((await self.session.execute(stmt)).scalars().all())
+
     # --- Poll map (native quiz mode only) ---
     async def register_poll(
         self,
         poll_id: str,
+        message_id: int,
+        sent_at: datetime,
         session_id: int,
         question_index: int,
         correct_option_index: int,
@@ -135,6 +154,8 @@ class QuizRepository(BaseRepository[Question]):
     ) -> PollMap:
         entry = PollMap(
             poll_id=poll_id,
+            message_id=message_id,
+            sent_at=sent_at,
             session_id=session_id,
             question_index=question_index,
             correct_option_index=correct_option_index,

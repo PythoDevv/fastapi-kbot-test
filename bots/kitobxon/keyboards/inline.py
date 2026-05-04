@@ -87,7 +87,7 @@ def quiz_status_keyboard(is_active: bool, is_waiting: bool, is_finished: bool) -
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="⏸ To'xtatish" if is_active or is_finished else "▶️ Boshlash",
+                    text="⏸ To'xtatish" if (is_active and not is_waiting) else "▶️ Boshlash",
                     callback_data="qs_toggle",
                 ),
             ]
@@ -193,5 +193,44 @@ def content_manage_keyboard(key: str, require_link: bool = False) -> InlineKeybo
                 InlineKeyboardButton(text="🗑 O'chirish", callback_data=f"ct_delete:{key}"),
             ],
             [InlineKeyboardButton(text=link_text, callback_data=f"ct_link:{key}")],
+        ]
+    )
+
+
+def results_main_keyboard() -> InlineKeyboardMarkup:
+    """Main results keyboard with Test and Referral buttons"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="📊 Testim", callback_data="res_test"),
+                InlineKeyboardButton(text="👥 Referallarim", callback_data="res_referral"),
+            ]
+        ]
+    )
+
+
+def results_back_keyboard() -> InlineKeyboardMarkup:
+    """Back to main results menu"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 Orqaga", callback_data="res_back")]
+        ]
+    )
+
+
+def quiz_settings_full_keyboard(is_active: bool, is_waiting: bool, is_finished: bool, require_phone: bool) -> InlineKeyboardMarkup:
+    """Full settings keyboard with status and phone toggle"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="⏸ To'xtatish" if (is_active and not is_waiting) else "▶️ Boshlash",
+                    callback_data="qs_toggle",
+                ),
+                InlineKeyboardButton(
+                    text=f"📱 Telefon {'✅' if require_phone else '❌'}",
+                    callback_data="ps:phone",
+                ),
+            ]
         ]
     )

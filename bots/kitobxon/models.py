@@ -114,10 +114,10 @@ class QuizSettings(Base, TimestampMixin):
     )
     limit_score: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
     time_limit_seconds: Mapped[int] = mapped_column(
-        Integer, default=30, nullable=False
+        Integer, default=40, nullable=False
     )
     questions_per_test: Mapped[int] = mapped_column(
-        Integer, default=10, nullable=False
+        Integer, default=40, nullable=False
     )
     waiting: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     finished: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -127,6 +127,7 @@ class QuizSettings(Base, TimestampMixin):
     image_id: Mapped[str | None] = mapped_column(String(500))
     intro_text: Mapped[str | None] = mapped_column(Text)
     require_link: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    require_phone_number: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
 class Question(Base, TimestampMixin):
@@ -199,6 +200,10 @@ class PollMap(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     poll_id: Mapped[str] = mapped_column(
         String(128), unique=True, index=True, nullable=False
+    )
+    message_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
     )
     session_id: Mapped[int] = mapped_column(
         ForeignKey(f"{t('test_sessions')}.id", ondelete="CASCADE"),

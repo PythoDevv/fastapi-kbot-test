@@ -258,5 +258,9 @@ class AdminService:
         s = await self.quiz.ensure_settings()
         s.quiz_type = quiz_type
 
+    async def toggle_require_phone(self) -> None:
+        s = await self.quiz.ensure_settings()
+        s.require_phone_number = not s.require_phone_number
+
     async def get_settings(self):
         return await self.quiz.ensure_settings()

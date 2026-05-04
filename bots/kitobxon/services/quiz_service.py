@@ -222,11 +222,15 @@ class QuizService:
     async def register_poll(
         self,
         poll_id: str,
+        message_id: int,
+        sent_at,
         session_id: int,
         payload: QuestionPayload,
     ) -> PollMap:
         return await self.quiz.register_poll(
             poll_id=poll_id,
+            message_id=message_id,
+            sent_at=sent_at,
             session_id=session_id,
             question_index=payload.index,
             correct_option_index=payload.correct_option_index,

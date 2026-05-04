@@ -4,6 +4,7 @@ from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import inline, reply
+from bots.kitobxon.repositories import QuizRepository
 from bots.kitobxon.services import AuthService, SubsService
 from bots.kitobxon.states import AuthStates
 from core.logging import get_logger
@@ -14,18 +15,30 @@ router = Router(name="auth")
 
 @router.message(AuthStates.awaiting_name)
 async def handle_name_input(
-    message: Message, state: FSMContext, session: AsyncSession
+    message: Message, state: FSMContext, session: AsyncSession, bot: Bot
 ) -> None:
     name = (message.text or "").strip()
     if len(name) < 3:
         await message.answer("Iltimos, to'liq ism familiyangizni kiriting (kamida 3 harf):")
         return
-    await AuthService(session).set_name(message.from_user.id, name)
-    await state.set_state(AuthStates.awaiting_phone)
-    await message.answer(
-        "Telefon raqamingizni yuboring:",
-        reply_markup=reply.phone_request(),
-    )
+
+    auth = AuthService(session)
+    await auth.set_name(message.from_user.id, name)
+
+    # Check if phone number is required
+    quiz_repo = QuizRepository(session)
+    settings = await quiz_repo.get_settings()
+    require_phone = settings.require_phone_number if settings else False
+
+    if require_phone:
+        await state.set_state(AuthStates.awaiting_phone)
+        await message.answer(
+            "Telefon raqamingizni yuboring:",
+            reply_markup=reply.phone_request(),
+        )
+    else:
+        # Skip phone and finish registration
+        await _finish_registration(message, state, session, bot, phone="")
 
 
 @router.message(AuthStates.awaiting_phone, F.contact)

@@ -34,25 +34,27 @@ async def cmd_start(
         except (ValueError, Exception):
             pass
 
+    # Check subscription first (for both new and registered users)
+    subs = SubsService(session)
+    status = await subs.check_user(bot, message.from_user.id, result.user.id)
+    if not status.all_subscribed:
+        await message.answer(
+            "Botdan foydalanish uchun quyidagi kanallarga obuna bo'ling:",
+            reply_markup=inline.subscription_keyboard(
+                status.missing_channels, status.missing_zayafka
+            ),
+        )
+        return
+
     if result.user.is_registered:
-        subs = SubsService(session)
-        status = await subs.check_user(bot, message.from_user.id, result.user.id)
-        if not status.all_subscribed:
-            await message.answer(
-                "Botdan foydalanish uchun quyidagi kanallarga obuna bo'ling:",
-                reply_markup=inline.subscription_keyboard(
-                    status.missing_channels, status.missing_zayafka
-                ),
-            )
-            return
         await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
         return
 
-    # New user — collect name
+    # New user — collect name (no cancel allowed, subscriptions already checked)
     await state.set_state(AuthStates.awaiting_name)
     await message.answer(
         "Assalomu alaykum! Ismingiz va familiyangizni kiriting:",
-        reply_markup=reply.cancel_only(),
+        reply_markup=reply.REMOVE,
     )
 
 

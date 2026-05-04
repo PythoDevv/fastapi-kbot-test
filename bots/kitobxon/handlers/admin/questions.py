@@ -227,8 +227,13 @@ async def import_questions_excel(
         return
     from bots.kitobxon.utils.excel import import_questions_from_excel
     import tempfile, os
+
+    # Determine file extension from document name
+    filename = message.document.file_name or "file.xlsx"
+    ext = ".csv" if filename.lower().endswith(".csv") else ".xlsx"
+
     file = await bot.get_file(message.document.file_id)
-    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
         await bot.download_file(file.file_path, tmp.name)
         tmp_path = tmp.name
     try:

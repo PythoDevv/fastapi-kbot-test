@@ -44,7 +44,11 @@ async def main() -> None:
     logger.info("Polling mode started: @%s", me.username)
 
     try:
-        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+        allowed_updates = list(dp.resolve_used_update_types())
+        # Ensure poll_answer updates are allowed
+        if "poll_answer" not in allowed_updates:
+            allowed_updates.append("poll_answer")
+        await dp.start_polling(bot, allowed_updates=allowed_updates)
     finally:
         await bot.session.close()
         await dispose_engine()
