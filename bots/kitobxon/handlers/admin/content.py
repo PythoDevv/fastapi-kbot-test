@@ -1,6 +1,6 @@
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message, PhotoSize
+from aiogram.types import CallbackQuery, Message, PhotoSize, ParseMode
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import inline, reply
@@ -102,18 +102,27 @@ async def receive_content_text(
     data = await state.get_data()
     key = data.get("content_key")
 
-    # Save text to DB
+    # Save text to DB with HTML entities
     repo = ContentRepository(session)
     await repo.upsert(key=key, text=message.text)
 
     await state.set_state(AdminContentStates.waiting_image)
     await state.update_data(content_key=key)
 
+    # Show preview of the content as it will appear to users
     await message.answer(
-        "✅ Matn saqlandi.\n\n"
+        "<b>✅ Matn saqlandi. Quyida namuna:</b>",
+        parse_mode=ParseMode.HTML,
+    )
+    await message.answer(
+        message.text,
+        parse_mode=ParseMode.HTML,
+    )
+    await message.answer(
         "Rasmni yuboring (ixtiyoriy):\n"
         "Yoki <b>o'tkazib yuborish</b> tugmasini bosing.",
         reply_markup=reply.cancel_only(),
+        parse_mode=ParseMode.HTML,
     )
 
 

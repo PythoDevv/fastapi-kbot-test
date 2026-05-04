@@ -3,7 +3,7 @@ import os
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import Message, ParseMode
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import reply
@@ -70,9 +70,13 @@ async def referral_link(message: Message, session: AsyncSession) -> None:
 
     # Send with or without photo based on content.image_id
     if content and content.image_id:
-        await message.answer_photo(photo=content.image_id, caption=final_text)
+        await message.answer_photo(
+            photo=content.image_id,
+            caption=final_text,
+            parse_mode=ParseMode.HTML,
+        )
     else:
-        await message.answer(final_text)
+        await message.answer(final_text, parse_mode=ParseMode.HTML)
 
 
 @router.message(F.text == "📝 Tanlov shartlari")
@@ -84,10 +88,15 @@ async def show_nizom(message: Message, session: AsyncSession) -> None:
         return
     if content.image_id:
         await message.answer_photo(
-            photo=content.image_id, caption=content.text or ""
+            photo=content.image_id,
+            caption=content.text or "",
+            parse_mode=ParseMode.HTML,
         )
     else:
-        await message.answer(content.text or "Tanlov shartlari.")
+        await message.answer(
+            content.text or "Tanlov shartlari.",
+            parse_mode=ParseMode.HTML,
+        )
 
 
 @router.message(F.text == "Tanlov kitoblari 📚")
@@ -120,7 +129,12 @@ async def show_prizes(message: Message, session: AsyncSession) -> None:
         return
     if content.image_id:
         await message.answer_photo(
-            photo=content.image_id, caption=content.text or ""
+            photo=content.image_id,
+            caption=content.text or "",
+            parse_mode=ParseMode.HTML,
         )
     else:
-        await message.answer(content.text or "Sovg'alar haqida ma'lumot.")
+        await message.answer(
+            content.text or "Sovg'alar haqida ma'lumot.",
+            parse_mode=ParseMode.HTML,
+        )
