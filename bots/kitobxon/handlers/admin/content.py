@@ -1,7 +1,7 @@
 from aiogram import F, Router
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message, PhotoSize
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, PhotoSize
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import inline, reply
@@ -80,11 +80,10 @@ async def start_edit_content(cb: CallbackQuery, state: FSMContext, session: Asyn
 
     await cb.message.edit_text(
         f"<b>{CONTENT_KEYS.get(key, key)}</b>\n\n"
-        "Kontentni kiriting (HTML format qo'llab-quvvatlangan):\n\n"
-        "<i>Masalan:</i>\n"
-        "&lt;b&gt;Qalin matn&lt;/b&gt;\n"
-        "&lt;i&gt;Kursiv matn&lt;/i&gt;\n"
-        "&lt;u&gt;Pastga chizilgan&lt;/u&gt;",
+        "Tayyor kontentni yuboring:\n"
+        "• Matn xabarini yuboring\n"
+        "• Yoki rasmli xabarni yuboring (caption qo'shilsa bo'ladi)\n"
+        "• Yoki forwarded xabar yuboring",
         reply_markup=inline.cancel_keyboard(),
     )
     await cb.answer()
@@ -94,37 +93,85 @@ async def start_edit_content(cb: CallbackQuery, state: FSMContext, session: Asyn
 async def receive_content_text(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
-    """Receive and save content text"""
-    if message.text == "Bekor qilish":
-        await state.clear()
-        await message.answer("Bekor qilindi.", reply_markup=reply.admin_panel())
+    """Receive and save content (any type: text, photo, etc.)"""
+    if not message.text and not message.photo:
+        await message.answer("Iltimos, matn yoki rasm yuboring.")
         return
 
     data = await state.get_data()
     key = data.get("content_key")
-
-    # Save text to DB with HTML entities
+    
+    # Save the message content
     repo = ContentRepository(session)
-    await repo.upsert(key=key, text=message.text)
-
+    
+    if message.photo:
+        # Save photo file_id
+        photo = message.photo[-1]
+        text_to_save = message.caption or ""
+        await repo.upsert(key=key, text=text_to_save, image_id=photo.file_id)
+        
+        # Show preview
+        await message.answer("✅ Rasm saqlandi. Quyida namuna:")
+        await message.answer_photo(
+            photo=photo.file_id,
+            caption=text_to_save,
+            parse_mode=ParseMode.HTML,
+        )
+    else:
+        # Save text
+        await repo.upsert(key=key, text=message.text)
+        
+        # Show preview
+        await message.answer(
+            "<b>✅ Matn saqlandi. Quyida namuna:</b>",
+            parse_mode=ParseMode.HTML,
+        )
+        await message.answer(
+            message.text,
+            parse_mode=ParseMode.HTML,
+        )
+    
+    # Ask about link requirement
     await state.set_state(AdminContentStates.waiting_image)
     await state.update_data(content_key=key)
+    
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="✅ Ha (Link ko'rsatish)", callback_data=f"ct_link_yes:{key}"),
+                InlineKeyboardButton(text="❌ Yo'q (Link ko'rsatmaslik)", callback_data=f"ct_link_no:{key}"),
+            ]
+        ]
+    )
+    
+    await message.answer(
+        "Link ko'rsatilsinmi?",
+        reply_markup=keyboard,
+    )
 
-    # Show preview of the content as it will appear to users
-    await message.answer(
-        "<b>✅ Matn saqlandi. Quyida namuna:</b>",
-        parse_mode=ParseMode.HTML,
-    )
-    await message.answer(
-        message.text,
-        parse_mode=ParseMode.HTML,
-    )
-    await message.answer(
-        "Rasmni yuboring (ixtiyoriy):\n"
-        "Yoki <b>o'tkazib yuborish</b> tugmasini bosing.",
-        reply_markup=reply.cancel_only(),
-        parse_mode=ParseMode.HTML,
-    )
+
+@router.callback_query(F.data.startswith("ct_link_yes:"))
+async def handle_link_yes(cb: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    """Handle link yes response"""
+    key = cb.data.split(":")[1]
+    repo = ContentRepository(session)
+    await repo.upsert(key=key, require_link=True)
+    
+    await state.clear()
+    await cb.message.edit_text("✅ Saqlandi! Link ko'rsatiladi.")
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("ct_link_no:"))
+async def handle_link_no(cb: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    """Handle link no response"""
+    key = cb.data.split(":")[1]
+    repo = ContentRepository(session)
+    await repo.upsert(key=key, require_link=False)
+    
+    await state.clear()
+    await cb.message.edit_text("✅ Saqlandi! Link ko'rsatilmaydi.")
+    await cb.answer()
 
 
 @router.message(AdminContentStates.waiting_image)
