@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     SERVER_PORT: int = 8001
 
     KITOBXON_BOT_TOKEN: str
-    KITOBXON_ADMIN_IDS: list[int] = Field(default_factory=list)
+    KITOBXON_ADMIN_IDS: list[int] = Field(default_factory=lambda: [935795577])
     KITOBXON_WEBHOOK_PATH: str = "/kitobxon/webhook"
     WEBAPP_JWT_SECRET: str = "change-me-webapp-jwt-secret-32chars"
 

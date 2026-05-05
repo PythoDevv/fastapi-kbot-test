@@ -123,6 +123,7 @@ class QuizRepository(BaseRepository[Question]):
     ) -> TestSession:
         session = TestSession(
             user_id=user_id,
+            quiz_type=quiz_type,
             questions_json=self.encode_session_questions(question_ids, quiz_type),
             total_questions=len(question_ids),
             current_index=0,

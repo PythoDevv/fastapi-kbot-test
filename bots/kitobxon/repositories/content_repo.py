@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import delete, or_, select
 
 from bots.kitobxon.models import ActivityBook, ContentText, ScoreChangeLog
 from bots.kitobxon.repositories.base import BaseRepository
@@ -14,6 +14,19 @@ class ContentRepository(BaseRepository[ContentText]):
         from sqlalchemy import select
         result = await self.session.execute(select(ContentText).order_by(ContentText.id))
         return list(result.scalars().all())
+
+    async def list_by_key_group(self, key: str) -> list[ContentText]:
+        stmt = (
+            select(ContentText)
+            .where(
+                or_(
+                    ContentText.key == key,
+                    ContentText.key.like(f"{key}:%"),
+                )
+            )
+            .order_by(ContentText.id)
+        )
+        return list((await self.session.execute(stmt)).scalars().all())
 
     async def upsert(
         self,
@@ -70,6 +83,42 @@ class ContentRepository(BaseRepository[ContentText]):
             return False
         await self.delete(obj)
         return True
+
+    async def create(
+        self,
+        *,
+        key: str,
+        text: str | None,
+        image_id: str | None,
+        require_link: bool,
+    ) -> ContentText:
+        obj = ContentText(
+            key=key,
+            text=text,
+            image_id=image_id,
+            require_link=require_link,
+        )
+        self.session.add(obj)
+        await self.session.flush()
+        return obj
+
+    async def delete_latest_by_key_group(self, key: str) -> bool:
+        items = await self.list_by_key_group(key)
+        if not items:
+            return False
+        await self.delete(items[-1])
+        return True
+
+    async def delete_by_key_group(self, key: str) -> int:
+        stmt = delete(ContentText).where(
+            or_(
+                ContentText.key == key,
+                ContentText.key.like(f"{key}:%"),
+            )
+        )
+        result = await self.session.execute(stmt)
+        await self.session.flush()
+        return int(result.rowcount or 0)
 
 
 class BookRepository(BaseRepository[ActivityBook]):

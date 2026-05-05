@@ -243,6 +243,7 @@ async def set_referral_link_choice(
         text=data.get("saved_text"),
         image_id=data.get("saved_image_id"),
         require_link=include_link,
+        append=True,
     )
     await state.clear()
     await cb.message.edit_text(
@@ -295,13 +296,7 @@ async def clear_referral_post(message: Message, session: AsyncSession) -> None:
         return
     service = AdminService(session)
     await service.clear_content_post("referral")
-    await service.save_content_post(
-        key="referral",
-        text=None,
-        image_id=None,
-        require_link=True,
-    )
-    await message.answer("✅ Taklif posti tozalandi.", reply_markup=reply.admin_content_menu())
+    await message.answer("✅ Taklif postlari tozalandi.", reply_markup=reply.admin_content_menu())
 
 
 @router.message(F.text == "Tanlov shartlari postini o'chirish")

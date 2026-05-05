@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -296,7 +297,16 @@ class AdminService:
         text: str | None,
         image_id: str | None,
         require_link: bool = False,
+        append: bool = False,
     ) -> None:
+        if append:
+            await self.contents.create(
+                key=f"{key}:{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}",
+                text=text,
+                image_id=image_id,
+                require_link=require_link,
+            )
+            return
         await self.contents.replace(
             key=key,
             text=text,
@@ -305,9 +315,14 @@ class AdminService:
         )
 
     async def clear_content_post(self, key: str) -> None:
+        if key == "referral":
+            await self.contents.delete_by_key_group(key)
+            return
         await self.contents.clear(key)
 
     async def delete_content_post(self, key: str) -> bool:
+        if key == "referral":
+            return await self.contents.delete_latest_by_key_group(key)
         return await self.contents.delete_by_key(key)
 
     async def add_book(

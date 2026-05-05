@@ -44,47 +44,47 @@ async def change_name(message: Message, state: FSMContext) -> None:
 async def referral_link(message: Message, session: AsyncSession) -> None:
     bot_username = (await message.bot.get_me()).username
     link = f"https://t.me/{bot_username}?start={message.from_user.id}"
-    user_repo = UserRepository(session)
-    user = await user_repo.get_by_telegram_id(message.from_user.id)
-    count = user.referrals_count if user else 0
 
-    # Get custom referral content if exists
     content_repo = ContentRepository(session)
-    content = await content_repo.get_by_key("referral")
-
-    # Build message
-    text_parts = []
-
-    # Add custom content text if exists
-    if content and content.text:
-        text_parts.append(content.text)
-
-    # Add referral link if content requires it or if no content exists
-    should_show_link = (not content) or content.require_link
-    if should_show_link:
-        text_parts.append(f"{link}")
-
-    final_text = "\n\n".join(text_parts)
-
-    # Build button when link is shown
-    reply_markup = None
-    if should_show_link:
+    contents = await content_repo.list_by_key_group("referral")
+    if not contents:
         reply_markup = InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="🔗 Referal havola", url=link)]
             ]
         )
+        await message.answer(link, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+        return
 
-    # Send with or without photo based on content.image_id
-    if content and content.image_id:
-        await message.answer_photo(
-            photo=content.image_id,
-            caption=final_text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=reply_markup,
-        )
-    else:
-        await message.answer(final_text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+    for content in contents:
+        text_parts = []
+        if content.text:
+            text_parts.append(content.text)
+        if content.require_link:
+            text_parts.append(link)
+
+        final_text = "\n\n".join(text_parts) or link
+        reply_markup = None
+        if content.require_link:
+            reply_markup = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="🔗 Referal havola", url=link)]
+                ]
+            )
+
+        if content.image_id:
+            await message.answer_photo(
+                photo=content.image_id,
+                caption=final_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup,
+            )
+        else:
+            await message.answer(
+                final_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup,
+            )
 
 
 @router.message(F.text == "📝 Tanlov shartlari")
@@ -122,9 +122,7 @@ async def show_books(message: Message, session: AsyncSession) -> None:
     for index, book in enumerate(books, start=1):
         title = (book.title or "").strip()
         button_text = (book.button_text or "").strip()
-        if title and button_text:
-            book_lines.append(f"{index}. {title}\nO'qish: {button_text}")
-        elif title:
+        if title:
             book_lines.append(f"{index}. {title}")
         elif button_text:
             book_lines.append(f"{index}. {button_text}")

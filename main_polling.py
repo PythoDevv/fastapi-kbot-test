@@ -22,6 +22,7 @@ from core.config import settings
 from core.database import AsyncSessionLocal, dispose_engine
 from core.logging import get_logger, setup_logging
 from core.middleware import DbSessionMiddleware
+from core.admin_init import initialize_admins
 
 setup_logging()
 logger = get_logger(__name__)
@@ -37,6 +38,10 @@ async def main() -> None:
     dp["bot_name"] = "kitobxon"
     dp.update.middleware(DbSessionMiddleware(AsyncSessionLocal))
     dp.include_router(build_router())
+
+    # Initialize default admin users for polling startup too
+    async with AsyncSessionLocal() as session:
+        await initialize_admins(session, settings.KITOBXON_ADMIN_IDS)
 
     # Drop webhook so Telegram sends updates to polling
     await bot.delete_webhook(drop_pending_updates=False)

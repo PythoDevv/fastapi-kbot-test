@@ -52,9 +52,22 @@ class ResultsService:
         )
 
     async def top_by_score(
-        self, telegram_id: int, limit: int = 10
+        self, telegram_id: int, limit: int = 30
     ) -> list[RatingEntry]:
         top = await self.users.top_by_score(limit)
+        return [
+            RatingEntry(
+                rank=i + 1,
+                user=u,
+                is_current=u.telegram_id == telegram_id,
+            )
+            for i, u in enumerate(top)
+        ]
+
+    async def top_test_takers(
+        self, telegram_id: int, limit: int = 30
+    ) -> list[RatingEntry]:
+        top = await self.users.get_top_by_score_solved(limit)
         return [
             RatingEntry(
                 rank=i + 1,

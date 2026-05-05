@@ -109,6 +109,9 @@ class QuizService:
         test_session = await self.quiz.get_session(session_id)
         if test_session is None:
             return None
+        session_quiz_type = getattr(test_session, "quiz_type", None)
+        if session_quiz_type is not None:
+            return session_quiz_type
         _, quiz_type = self.quiz.decode_session_questions(test_session.questions_json)
         if quiz_type is not None:
             return quiz_type

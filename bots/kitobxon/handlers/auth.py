@@ -4,7 +4,7 @@ from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import inline, reply
-from bots.kitobxon.repositories import QuizRepository
+from bots.kitobxon.repositories import QuizRepository, UserRepository
 from bots.kitobxon.services import AuthService, SubsService
 from bots.kitobxon.states import AuthStates
 from core.logging import get_logger
@@ -17,13 +17,23 @@ router = Router(name="auth")
 async def handle_name_input(
     message: Message, state: FSMContext, session: AsyncSession, bot: Bot
 ) -> None:
-    name = (message.text or "").strip()
-    if len(name) < 3:
+    text = (message.text or "").strip()
+    if text == "Bekor qilish":
+        await state.clear()
+        user_repo = UserRepository(session)
+        user = await user_repo.get_by_telegram_id(message.from_user.id)
+        if user and user.is_admin:
+            await message.answer("Admin panel:", reply_markup=reply.admin_panel())
+        else:
+            await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
+        return
+
+    if len(text) < 3:
         await message.answer("Iltimos, to'liq ism familiyangizni kiriting (kamida 3 harf):")
         return
 
     auth = AuthService(session)
-    await auth.set_name(message.from_user.id, name)
+    await auth.set_name(message.from_user.id, text)
 
     # Check if phone number is required
     quiz_repo = QuizRepository(session)
@@ -91,10 +101,20 @@ async def _finish_registration(
 async def handle_name_change(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
-    name = (message.text or "").strip()
-    if len(name) < 3:
+    text = (message.text or "").strip()
+    if text == "Bekor qilish":
+        await state.clear()
+        user_repo = UserRepository(session)
+        user = await user_repo.get_by_telegram_id(message.from_user.id)
+        if user and user.is_admin:
+            await message.answer("Admin panel:", reply_markup=reply.admin_panel())
+        else:
+            await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
+        return
+
+    if len(text) < 3:
         await message.answer("Iltimos, to'liq ism familiyangizni kiriting (kamida 3 harf):")
         return
-    await AuthService(session).set_name(message.from_user.id, name)
+    await AuthService(session).set_name(message.from_user.id, text)
     await state.clear()
-    await message.answer(f"Ismingiz o'zgartirildi: <b>{name}</b>", reply_markup=reply.main_menu())
+    await message.answer(f"Ismingiz o'zgartirildi: <b>{text}</b>", reply_markup=reply.main_menu())
