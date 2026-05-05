@@ -117,13 +117,29 @@ async def show_books(message: Message, session: AsyncSession) -> None:
     if not books:
         await message.answer("Hozircha kitoblar yo'q.")
         return
+
+    book_lines = []
+    for index, book in enumerate(books, start=1):
+        title = (book.title or "").strip()
+        button_text = (book.button_text or "").strip()
+        if title and button_text:
+            book_lines.append(f"{index}. {title}\nO'qish: {button_text}")
+        elif title:
+            book_lines.append(f"{index}. {title}")
+        elif button_text:
+            book_lines.append(f"{index}. {button_text}")
+
     buttons = [
         [InlineKeyboardButton(text=b.button_text or b.title or "Kitob", url=b.button_url)]
         for b in books
         if b.button_url
     ]
+    text = "Tanlov kitoblari:"
+    if book_lines:
+        text = f"{text}\n\n" + "\n\n".join(book_lines)
+
     await message.answer(
-        "Tanlov kitoblari:",
+        text,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None,
     )
 

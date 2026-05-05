@@ -1,4 +1,3 @@
-import json
 from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -110,7 +109,13 @@ class QuizService:
         test_session = await self.quiz.get_session(session_id)
         if test_session is None:
             return None
-        return getattr(test_session, "quiz_type", None) or QuizType.WEB
+        _, quiz_type = self.quiz.decode_session_questions(test_session.questions_json)
+        if quiz_type is not None:
+            return quiz_type
+        if await self.quiz.has_polls_for_session(session_id):
+            return QuizType.QUIZ
+        settings = await self.quiz.get_settings()
+        return settings.quiz_type if settings else QuizType.WEB
 
     # ---------- Fetch ----------
     async def get_current_payload(
@@ -119,7 +124,7 @@ class QuizService:
         test_session = await self.quiz.get_session(session_id)
         if test_session is None or test_session.is_completed:
             return None
-        question_ids = json.loads(test_session.questions_json or "[]")
+        question_ids, _ = self.quiz.decode_session_questions(test_session.questions_json)
         if test_session.current_index >= len(question_ids):
             return None
         questions = await self.quiz.get_questions_by_ids(question_ids)
@@ -154,7 +159,9 @@ class QuizService:
         if await self.quiz.answer_exists(session_id, question_index):
             raise QuizNotActiveError("Bu savolga javob berilgan")
 
-        question_ids = json.loads(test_session.questions_json or "[]")
+        question_ids, _ = self.quiz.decode_session_questions(test_session.questions_json)
+        if question_index >= len(question_ids):
+            raise QuizNotActiveError("Savol tartibi buzilgan")
         question = await self.quiz.get(question_ids[question_index])
         if question is None:
             raise QuizNotActiveError("Savol topilmadi")

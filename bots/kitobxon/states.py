@@ -31,6 +31,7 @@ class AdminZayafkaStates(StatesGroup):
 
 class AdminContentStates(StatesGroup):
     waiting_content_message = State()
+    waiting_referral_link_choice = State()
     waiting_book_title = State()
     waiting_book_button_text = State()
     waiting_book_button_url = State()

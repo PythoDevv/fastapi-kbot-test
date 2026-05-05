@@ -77,6 +77,46 @@ async def _show_content_preview(
         )
 
 
+async def _show_referral_preview(
+    message: Message,
+    *,
+    text: str | None,
+    image_id: str | None,
+    include_link: bool,
+) -> None:
+    bot_username = (await message.bot.get_me()).username
+    link = f"https://t.me/{bot_username}?start={message.from_user.id}"
+
+    text_parts = []
+    if text:
+        text_parts.append(text)
+    if include_link:
+        text_parts.append(link)
+
+    final_text = "\n\n".join(text_parts) or "Taklif posti saqlandi."
+    reply_markup = None
+    if include_link:
+        reply_markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="🔗 Referal havola", url=link)]
+            ]
+        )
+
+    if image_id:
+        await message.answer_photo(
+            photo=image_id,
+            caption=final_text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup,
+        )
+    else:
+        await message.answer(
+            final_text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup,
+        )
+
+
 def _books_delete_keyboard(books) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -87,6 +127,23 @@ def _books_delete_keyboard(books) -> InlineKeyboardMarkup:
                 )
             ]
             for book in books
+        ]
+    )
+
+
+def _referral_link_choice_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Ha, qo'yilsin",
+                    callback_data="referral_link:yes",
+                ),
+                InlineKeyboardButton(
+                    text="❌ Yo'q, qo'yilmasin",
+                    callback_data="referral_link:no",
+                ),
+            ]
         ]
     )
 
@@ -149,12 +206,59 @@ async def save_content_message(
             key=str(data["key"]),
             text=text,
             image_id=image_id,
-            require_link=bool(data.get("require_link", False)),
+            require_link=False if data.get("key") == "referral" else bool(data.get("require_link", False)),
         )
+
+    if data.get("key") == "referral":
+        await state.set_state(AdminContentStates.waiting_referral_link_choice)
+        await state.update_data(saved_text=text, saved_image_id=image_id)
+        await message.answer(
+            "Link va tugma qo'yilsinmi?",
+            reply_markup=_referral_link_choice_keyboard(),
+        )
+        return
 
     await state.clear()
     await message.answer("✅ Saqlandi. Quyida namuna:", reply_markup=reply.admin_content_menu())
     await _show_content_preview(message, text=text, image_id=image_id)
+
+
+@router.callback_query(
+    AdminContentStates.waiting_referral_link_choice,
+    F.data.in_({"referral_link:yes", "referral_link:no"}),
+)
+async def set_referral_link_choice(
+    cb: CallbackQuery, state: FSMContext, session: AsyncSession
+) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+
+    include_link = cb.data.endswith(":yes")
+    data = await state.get_data()
+    await AdminService(session).save_content_post(
+        key="referral",
+        text=data.get("saved_text"),
+        image_id=data.get("saved_image_id"),
+        require_link=include_link,
+    )
+    await state.clear()
+    await cb.message.edit_text(
+        "✅ Saqlandi. Link va tugma qo'yiladi."
+        if include_link
+        else "✅ Saqlandi. Link ham, tugma ham qo'yilmaydi."
+    )
+    await cb.message.answer(
+        "Quyida namuna:",
+        reply_markup=reply.admin_content_menu(),
+    )
+    await _show_referral_preview(
+        cb.message,
+        text=data.get("saved_text"),
+        image_id=data.get("saved_image_id"),
+        include_link=include_link,
+    )
+    await cb.answer()
 
 
 @router.message(F.text == "Test stop postini o'chirish")

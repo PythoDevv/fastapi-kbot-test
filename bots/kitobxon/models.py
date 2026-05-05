@@ -165,16 +165,7 @@ class TestSession(Base, TimestampMixin):
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    quiz_type: Mapped[QuizType] = mapped_column(
-        SAEnum(
-            QuizType,
-            name="quiz_type_enum",
-            values_callable=quiz_type_db_values,
-        ),
-        default=QuizType.WEB,
-        nullable=False,
-    )
-    questions_json: Mapped[str | None] = mapped_column(Text)  # list[int] JSON
+    questions_json: Mapped[str | None] = mapped_column(Text)
     current_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_questions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

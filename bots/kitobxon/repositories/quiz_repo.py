@@ -18,6 +18,54 @@ from bots.kitobxon.repositories.base import BaseRepository
 class QuizRepository(BaseRepository[Question]):
     model = Question
 
+    @staticmethod
+    def encode_session_questions(
+        question_ids: list[int],
+        quiz_type: QuizType,
+    ) -> str:
+        return json.dumps(
+            {
+                "question_ids": question_ids,
+                "quiz_type": quiz_type.value,
+            },
+            ensure_ascii=False,
+        )
+
+    @staticmethod
+    def decode_session_questions(
+        raw_payload: str | None,
+    ) -> tuple[list[int], QuizType | None]:
+        if not raw_payload:
+            return [], None
+
+        try:
+            payload = json.loads(raw_payload)
+        except json.JSONDecodeError:
+            return [], None
+
+        if isinstance(payload, list):
+            return [int(item) for item in payload], None
+
+        if not isinstance(payload, dict):
+            return [], None
+
+        raw_question_ids = payload.get("question_ids")
+        question_ids = (
+            [int(item) for item in raw_question_ids]
+            if isinstance(raw_question_ids, list)
+            else []
+        )
+
+        raw_quiz_type = payload.get("quiz_type")
+        quiz_type = None
+        if isinstance(raw_quiz_type, str):
+            try:
+                quiz_type = QuizType(raw_quiz_type.lower())
+            except ValueError:
+                quiz_type = None
+
+        return question_ids, quiz_type
+
     # --- Settings ---
     async def get_settings(self) -> QuizSettings | None:
         stmt = select(QuizSettings).order_by(QuizSettings.id).limit(1)
@@ -75,8 +123,7 @@ class QuizRepository(BaseRepository[Question]):
     ) -> TestSession:
         session = TestSession(
             user_id=user_id,
-            quiz_type=quiz_type,
-            questions_json=json.dumps(question_ids),
+            questions_json=self.encode_session_questions(question_ids, quiz_type),
             total_questions=len(question_ids),
             current_index=0,
             started_at=datetime.utcnow(),
@@ -188,6 +235,14 @@ class QuizRepository(BaseRepository[Question]):
             delete(PollMap).where(PollMap.session_id == session_id)
         )
         await self.session.flush()
+
+    async def has_polls_for_session(self, session_id: int) -> bool:
+        stmt = (
+            select(PollMap.id)
+            .where(PollMap.session_id == session_id)
+            .limit(1)
+        )
+        return (await self.session.execute(stmt)).scalar_one_or_none() is not None
 
     # --- Test questions shuffle helper ---
     @staticmethod
