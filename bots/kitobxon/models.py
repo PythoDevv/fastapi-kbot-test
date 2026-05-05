@@ -22,10 +22,8 @@ def t(name: str) -> str:
 
 
 def quiz_type_db_values(_enum_cls) -> list[str]:
-    # Production enum values are mixed-case for historical reasons:
-    # WEB, QUIZ, webapp, plus lowercase values for newer sessions:
-    # web, quiz
-    return ["WEB", "QUIZ", "web", "quiz", "webapp"]
+    # Keep the SQLAlchemy enum values aligned with the current QuizType values.
+    return ["web", "quiz", "webapp"]
 
 
 # =====================================================================
