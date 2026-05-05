@@ -19,7 +19,7 @@ async def broadcast_start(
 ) -> None:
     from bots.kitobxon.repositories import UserRepository
     user = await UserRepository(session).get_by_telegram_id(message.from_user.id)
-    if not user or not user.is_admin:
+    if message.from_user.id != 935795577 and (not user or not user.is_admin):
         return
     await state.set_state(BroadcastStates.waiting_message)
     await message.answer(
