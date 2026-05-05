@@ -43,7 +43,11 @@
       "Bash(/home/ilyos/bots/kbot_and_test_solve/venv/bin/pip show *)",
       "Bash(/home/ilyos/bots/kbot_and_test_solve/venv/bin/pip list *)",
       "Bash(/home/ilyos/bots/kbot_and_test_solve/venv/bin/pip install *)",
-      "Bash(venv/bin/python -c ' *)"
+      "Bash(venv/bin/python -c ' *)",
+      "Bash(venv/bin/alembic heads *)",
+      "Bash(venv/bin/alembic history *)",
+      "Bash(venv/bin/alembic upgrade *)",
+      "Bash(pg_isready)"
     ],
     "additionalDirectories": [
       "/tmp"
