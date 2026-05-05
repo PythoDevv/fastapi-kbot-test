@@ -11,6 +11,16 @@ from bots.kitobxon.states import AdminContentStates
 router = Router(name="admin_content")
 
 
+def _as_html(text: str | None, entities) -> str:
+    """Convert text + entities to HTML string."""
+    if not text:
+        return ""
+    if entities:
+        from aiogram.utils.text_decorations import html_decoration
+        return html_decoration.unparse(text, entities)
+    return text
+
+
 async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
     from bots.kitobxon.repositories import UserRepository
     user = await UserRepository(session).get_by_telegram_id(telegram_id)
@@ -129,12 +139,10 @@ async def receive_content_text(
     repo = ContentRepository(session)
     
     if message.photo:
-        # Save photo file_id
         photo = message.photo[-1]
-        text_to_save = message.html_caption or ""
+        text_to_save = _as_html(message.caption, message.caption_entities)
         await repo.upsert(key=key, text=text_to_save, image_id=photo.file_id)
 
-        # Show preview
         await message.answer("✅ Rasm saqlandi. Quyida namuna:")
         await message.answer_photo(
             photo=photo.file_id,
@@ -142,8 +150,7 @@ async def receive_content_text(
             parse_mode=ParseMode.HTML,
         )
     else:
-        # Save text with HTML entities preserved
-        text_to_save = message.html_text
+        text_to_save = _as_html(message.text, message.entities)
         await repo.upsert(key=key, text=text_to_save)
 
         # Show preview

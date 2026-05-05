@@ -236,8 +236,14 @@ def results_back_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def quiz_settings_full_keyboard(is_active: bool, is_waiting: bool, is_finished: bool, require_phone: bool) -> InlineKeyboardMarkup:
-    """Full settings keyboard with status and phone toggle"""
+def quiz_settings_full_keyboard(
+    is_active: bool,
+    is_waiting: bool,
+    is_finished: bool,
+    require_phone: bool,
+    current_type: str,
+) -> InlineKeyboardMarkup:
+    """Full settings keyboard with status, phone toggle, and quiz type selection"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -249,7 +255,23 @@ def quiz_settings_full_keyboard(is_active: bool, is_waiting: bool, is_finished: 
                     text=f"📱 Telefon {'✅' if require_phone else '❌'}",
                     callback_data="ps:phone",
                 ),
-            ]
+            ],
+            [
+                InlineKeyboardButton(
+                    text=f"{'✅ ' if current_type == 'web' else ''}💬 Web",
+                    callback_data="qt:web",
+                ),
+                InlineKeyboardButton(
+                    text=f"{'✅ ' if current_type == 'quiz' else ''}📊 Quiz",
+                    callback_data="qt:quiz",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=f"{'✅ ' if current_type == 'webapp' else ''}🧑‍💻 WebApp",
+                    callback_data="qt:webapp",
+                ),
+            ],
         ]
     )
 

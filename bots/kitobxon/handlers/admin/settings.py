@@ -32,7 +32,13 @@ async def show_settings(message: Message, session: AsyncSession) -> None:
         f"O'tish bali: {s.limit_score}\n"
         f"Vaqt: {s.time_limit_seconds}s\n"
         f"Telefon: {phone_status}",
-        reply_markup=inline.quiz_settings_full_keyboard(s.active, s.waiting, s.finished, s.require_phone_number),
+        reply_markup=inline.quiz_settings_full_keyboard(
+            s.active,
+            s.waiting,
+            s.finished,
+            s.require_phone,
+            s.quiz_type.value,
+        ),
     )
 
 
@@ -70,7 +76,13 @@ async def toggle_quiz_status(cb: CallbackQuery, session: AsyncSession) -> None:
         f"O'tish bali: {s.limit_score}\n"
         f"Vaqt: {s.time_limit_seconds}s\n"
         f"Telefon: {phone_status}",
-        reply_markup=inline.quiz_settings_full_keyboard(s.active, s.waiting, s.finished, s.require_phone_number)
+        reply_markup=inline.quiz_settings_full_keyboard(
+            s.active,
+            s.waiting,
+            s.finished,
+            s.require_phone,
+            s.quiz_type.value,
+        )
     )
 
 
@@ -85,9 +97,17 @@ async def set_quiz_type(cb: CallbackQuery, session: AsyncSession) -> None:
     except ValueError:
         await cb.answer("Noto'g'ri tur.")
         return
-    await AdminService(session).set_quiz_type(quiz_type)
+    service = AdminService(session)
+    await service.set_quiz_type(quiz_type)
+    s = await service.get_settings()
     await cb.message.edit_reply_markup(
-        reply_markup=inline.quiz_type_keyboard(quiz_type.value)
+        reply_markup=inline.quiz_settings_full_keyboard(
+            s.active,
+            s.waiting,
+            s.finished,
+            s.require_phone,
+            s.quiz_type.value,
+        )
     )
     await cb.answer(f"Test turi: {quiz_type.value.upper()}", show_alert=True)
 
@@ -129,5 +149,11 @@ async def toggle_phone_setting(cb: CallbackQuery, session: AsyncSession) -> None
     phone_status = "✅ Talab" if s.require_phone_number else "❌ Ixtiyoriy"
     await cb.answer(f"Telefon: {phone_status}")
     await cb.message.edit_reply_markup(
-        reply_markup=inline.quiz_settings_full_keyboard(s.active, s.waiting, s.finished, s.require_phone_number)
+        reply_markup=inline.quiz_settings_full_keyboard(
+            s.active,
+            s.waiting,
+            s.finished,
+            s.require_phone_number,
+            s.quiz_type.value,
+        )
     )

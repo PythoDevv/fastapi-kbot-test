@@ -49,7 +49,13 @@
       "Bash(venv/bin/alembic upgrade *)",
       "Bash(pg_isready)",
       "Bash(venv/bin/python -c \"from bots.kitobxon.handlers.admin.content import router; print\\('OK'\\)\")",
-      "Bash(venv/bin/python -c \"from bots.kitobxon.keyboards.inline import content_list_keyboard; print\\(content_list_keyboard\\([]\\)\\)\")"
+      "Bash(venv/bin/python -c \"from bots.kitobxon.keyboards.inline import content_list_keyboard; print\\(content_list_keyboard\\([]\\)\\)\")",
+      "Read(//root/web_app_kbot/venv/lib/python3.11/site-packages/aiogram/**)",
+      "Bash(/root/web_app_kbot/venv/bin/pip show *)",
+      "Bash(python3 -c \"import aiogram; print\\(aiogram.__version__\\)\")",
+      "Read(//root/web_app_kbot/venv/lib/python3.11/**)",
+      "Bash(python3 -c \"from aiogram.types import Message; print\\([x for x in dir\\(Message\\) if 'html' in x.lower\\(\\) or 'caption' in x.lower\\(\\)]\\)\")",
+      "Bash(python3 -c ' *)"
     ],
     "additionalDirectories": [
       "/tmp"
