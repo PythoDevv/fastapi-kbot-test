@@ -65,6 +65,14 @@
 
   /* Options */
   .options { display: flex; flex-direction: column; gap: 10px; }
+  .feedback {
+    min-height: 24px;
+    margin: 10px 2px 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .feedback.correct { color: #2e7d32; }
+  .feedback.wrong { color: #c62828; }
   .option {
     background: #fff;
     border: 1.5px solid #e0e0e0;
@@ -205,6 +213,7 @@
   <div class="question-card" id="question-text"></div>
 
   <div class="options" id="options"></div>
+  <div class="feedback" id="feedback"></div>
 
   <button class="btn-next" id="btn-next" disabled onclick="onNext()">Keyingi Savol</button>
 </div>
@@ -288,6 +297,9 @@ function renderQuestion(q, total, timeLimitSeconds) {
   currentIndex = q.index;
   selectedOption = null;
   answering = false;
+  const feedbackEl = document.getElementById('feedback');
+  feedbackEl.textContent = '';
+  feedbackEl.className = 'feedback';
 
   document.getElementById('progress-text').textContent = (q.index + 1) + ' / ' + total;
   document.getElementById('progress-bar').style.width = ((q.index / total) * 100) + '%';
@@ -351,6 +363,10 @@ async function submitAnswer(answer) {
 
     correctAnswer = res.correct_answer;
 
+    const feedbackEl = document.getElementById('feedback');
+    feedbackEl.textContent = res.feedback_text || '';
+    feedbackEl.className = 'feedback ' + (res.is_correct ? 'correct' : 'wrong');
+
     // Show feedback colors briefly
     opts.forEach(el => {
       const text = el.querySelector('span').textContent;
@@ -359,7 +375,7 @@ async function submitAnswer(answer) {
       else if (text === answer && !res.is_correct) el.classList.add('wrong');
     });
 
-    await delay(answer ? 600 : 200);
+    await delay(answer ? 900 : 500);
 
     if (res.is_last) {
       showResult(res.score, res.total_questions);

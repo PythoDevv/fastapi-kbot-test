@@ -21,6 +21,12 @@ def t(name: str) -> str:
     return f"{TABLE_PREFIX}{name}"
 
 
+def quiz_type_db_values(_enum_cls) -> list[str]:
+    # Production enum values are mixed-case for historical reasons:
+    # WEB, QUIZ, webapp
+    return ["WEB", "QUIZ", "webapp"]
+
+
 # =====================================================================
 # Users
 # =====================================================================
@@ -108,7 +114,11 @@ class QuizSettings(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     quiz_type: Mapped[QuizType] = mapped_column(
-        SAEnum(QuizType, name="quiz_type_enum"),
+        SAEnum(
+            QuizType,
+            name="quiz_type_enum",
+            values_callable=quiz_type_db_values,
+        ),
         default=QuizType.WEB,
         nullable=False,
     )
@@ -155,6 +165,15 @@ class TestSession(Base, TimestampMixin):
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    quiz_type: Mapped[QuizType] = mapped_column(
+        SAEnum(
+            QuizType,
+            name="quiz_type_enum",
+            values_callable=quiz_type_db_values,
+        ),
+        default=QuizType.WEB,
+        nullable=False,
+    )
     questions_json: Mapped[str | None] = mapped_column(Text)  # list[int] JSON
     current_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

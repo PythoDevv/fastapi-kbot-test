@@ -32,6 +32,7 @@ class AnswerRequest(BaseModel):
 class AnswerResponse(BaseModel):
     is_correct: bool
     correct_answer: str
+    feedback_text: str
     score: int
     is_last: bool
     next_question: QuestionOut | None = None

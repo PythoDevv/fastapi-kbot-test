@@ -25,23 +25,29 @@ def _require_phone_enabled(settings_obj) -> bool:
     )
 
 
+def _format_settings_text(settings_obj) -> str:
+    status = "🟢 Faol" if settings_obj.active and not settings_obj.waiting and not settings_obj.finished else (
+        "🟡 Kutmoqda" if settings_obj.waiting else "🔴 Yakunlangan"
+    )
+    phone_status = "✅ Talab" if _require_phone_enabled(settings_obj) else "❌ Ixtiyoriy"
+    return (
+        f"<b>⚙️ Test sozlamalari</b>\n\n"
+        f"Status: {status}\n"
+        f"Tur: {settings_obj.quiz_type.value.upper()}\n"
+        f"Savollar: {settings_obj.questions_per_test}\n"
+        f"O'tish bali: {settings_obj.limit_score}\n"
+        f"Vaqt: {settings_obj.time_limit_seconds}s\n"
+        f"Telefon: {phone_status}"
+    )
+
+
 @router.message(F.text == "⚙️ Test sozlamalari")
 async def show_settings(message: Message, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
     s = await AdminService(session).get_settings()
-    status = "🟢 Faol" if s.active and not s.waiting and not s.finished else (
-        "🟡 Kutmoqda" if s.waiting else "🔴 Yakunlangan"
-    )
-    phone_status = "✅ Talab" if _require_phone_enabled(s) else "❌ Ixtiyoriy"
     await message.answer(
-        f"<b>⚙️ Test sozlamalari</b>\n\n"
-        f"Status: {status}\n"
-        f"Tur: {s.quiz_type.value.upper()}\n"
-        f"Savollar: {s.questions_per_test}\n"
-        f"O'tish bali: {s.limit_score}\n"
-        f"Vaqt: {s.time_limit_seconds}s\n"
-        f"Telefon: {phone_status}",
+        _format_settings_text(s),
         reply_markup=inline.quiz_settings_full_keyboard(
             s.active,
             s.waiting,
@@ -74,18 +80,8 @@ async def toggle_quiz_status(cb: CallbackQuery, session: AsyncSession) -> None:
         await cb.answer("Test to'xtatildi (waiting mode).")
 
     s = await service.get_settings()
-    status = "🟢 Faol" if s.active and not s.waiting and not s.finished else (
-        "🟡 Kutmoqda" if s.waiting else "🔴 Yakunlangan"
-    )
-    phone_status = "✅ Talab" if _require_phone_enabled(s) else "❌ Ixtiyoriy"
     await cb.message.edit_text(
-        f"<b>⚙️ Test sozlamalari</b>\n\n"
-        f"Status: {status}\n"
-        f"Tur: {s.quiz_type.value.upper()}\n"
-        f"Savollar: {s.questions_per_test}\n"
-        f"O'tish bali: {s.limit_score}\n"
-        f"Vaqt: {s.time_limit_seconds}s\n"
-        f"Telefon: {phone_status}",
+        _format_settings_text(s),
         reply_markup=inline.quiz_settings_full_keyboard(
             s.active,
             s.waiting,
@@ -110,7 +106,8 @@ async def set_quiz_type(cb: CallbackQuery, session: AsyncSession) -> None:
     service = AdminService(session)
     await service.set_quiz_type(quiz_type)
     s = await service.get_settings()
-    await cb.message.edit_reply_markup(
+    await cb.message.edit_text(
+        _format_settings_text(s),
         reply_markup=inline.quiz_settings_full_keyboard(
             s.active,
             s.waiting,
@@ -158,7 +155,8 @@ async def toggle_phone_setting(cb: CallbackQuery, session: AsyncSession) -> None
     s = await service.get_settings()
     phone_status = "✅ Talab" if _require_phone_enabled(s) else "❌ Ixtiyoriy"
     await cb.answer(f"Telefon: {phone_status}")
-    await cb.message.edit_reply_markup(
+    await cb.message.edit_text(
+        _format_settings_text(s),
         reply_markup=inline.quiz_settings_full_keyboard(
             s.active,
             s.waiting,

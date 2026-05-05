@@ -75,6 +75,8 @@ class QuizService:
             raise UserNotRegisteredError()
         if user.test_solved:
             raise AlreadySolvedError()
+        if await self.quiz.has_active_session(user.id):
+            raise QuizAlreadyStartedError()
 
         settings = await self.get_settings()
         if settings.waiting:
@@ -82,15 +84,14 @@ class QuizService:
         if settings.finished:
             raise QuizFinishedError()
 
-        if await self.quiz.has_active_session(user.id):
-            raise QuizAlreadyStartedError()
-
         questions = await self.quiz.get_random_questions(settings.questions_per_test)
         if not questions:
             raise NoQuestionsError()
 
         test_session = await self.quiz.create_session(
-            user_id=user.id, question_ids=[q.id for q in questions]
+            user_id=user.id,
+            question_ids=[q.id for q in questions],
+            quiz_type=settings.quiz_type,
         )
 
         first_payload = self._build_payload(
@@ -104,6 +105,12 @@ class QuizService:
             settings=settings,
             first_question=first_payload,
         )
+
+    async def get_session_quiz_type(self, session_id: int) -> QuizType | None:
+        test_session = await self.quiz.get_session(session_id)
+        if test_session is None:
+            return None
+        return getattr(test_session, "quiz_type", None) or QuizType.WEB
 
     # ---------- Fetch ----------
     async def get_current_payload(
@@ -242,6 +249,9 @@ class QuizService:
 
     async def delete_poll(self, poll_id: str) -> None:
         await self.quiz.delete_poll(poll_id)
+
+    async def delete_session_polls(self, session_id: int) -> None:
+        await self.quiz.delete_polls_for_session(session_id)
 
     # ---------- Utilities ----------
     def _build_payload(

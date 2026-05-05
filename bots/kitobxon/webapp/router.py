@@ -47,6 +47,12 @@ def _q_out(payload) -> QuestionOut:
     )
 
 
+def _feedback_text(is_correct: bool, correct_answer: str) -> str:
+    if is_correct:
+        return "To'g'ri javob"
+    return f"Noto'g'ri javob. To'g'ri javob: {correct_answer}"
+
+
 @router.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def webapp_index(request: Request):
     import os
@@ -135,6 +141,7 @@ async def submit_answer(
     return AnswerResponse(
         is_correct=result.is_correct,
         correct_answer=result.correct_answer,
+        feedback_text=_feedback_text(result.is_correct, result.correct_answer),
         score=result.score,
         is_last=result.is_last,
         next_question=_q_out(result.next_question) if result.next_question else None,

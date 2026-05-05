@@ -253,14 +253,17 @@ class AdminService:
     async def set_quiz_waiting(self, waiting: bool) -> None:
         s = await self.quiz.ensure_settings()
         s.waiting = waiting
+        await self.session.flush()
 
     async def set_quiz_finished(self, finished: bool) -> None:
         s = await self.quiz.ensure_settings()
         s.finished = finished
+        await self.session.flush()
 
     async def set_quiz_type(self, quiz_type: QuizType) -> None:
         s = await self.quiz.ensure_settings()
         s.quiz_type = quiz_type
+        await self.session.flush()
 
     async def set_waiting_post(
         self,
@@ -280,6 +283,7 @@ class AdminService:
     async def toggle_require_phone(self) -> None:
         s = await self.quiz.ensure_settings()
         s.require_phone_number = not s.require_phone_number
+        await self.session.flush()
 
     async def get_settings(self):
         return await self.quiz.ensure_settings()

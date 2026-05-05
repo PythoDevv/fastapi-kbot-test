@@ -2,8 +2,9 @@ import json
 import random
 from datetime import datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 
+from bots.kitobxon.config import QuizType
 from bots.kitobxon.models import (
     PollMap,
     Question,
@@ -70,10 +71,11 @@ class QuizRepository(BaseRepository[Question]):
         return (await self.session.execute(stmt)).scalar_one_or_none() is not None
 
     async def create_session(
-        self, user_id: int, question_ids: list[int]
+        self, user_id: int, question_ids: list[int], quiz_type: QuizType
     ) -> TestSession:
         session = TestSession(
             user_id=user_id,
+            quiz_type=quiz_type,
             questions_json=json.dumps(question_ids),
             total_questions=len(question_ids),
             current_index=0,
@@ -180,6 +182,12 @@ class QuizRepository(BaseRepository[Question]):
         if entry:
             await self.session.delete(entry)
             await self.session.flush()
+
+    async def delete_polls_for_session(self, session_id: int) -> None:
+        await self.session.execute(
+            delete(PollMap).where(PollMap.session_id == session_id)
+        )
+        await self.session.flush()
 
     # --- Test questions shuffle helper ---
     @staticmethod

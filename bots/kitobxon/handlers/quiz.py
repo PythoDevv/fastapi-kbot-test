@@ -36,6 +36,12 @@ def _format_question(payload: QuestionPayload) -> str:
     )
 
 
+def _answer_feedback_text(is_correct: bool, correct_answer: str) -> str:
+    if is_correct:
+        return "✅ To'g'ri javob"
+    return f"❌ Noto'g'ri javob\nTo'g'ri javob: <b>{correct_answer}</b>"
+
+
 def _cancel_timeout(user_id: int) -> None:
     """Cancel pending timeout task for user"""
     task = _timeout_tasks.pop(user_id, None)
@@ -273,8 +279,9 @@ async def start_quiz(
             return
 
         settings = await service.quiz.get_settings()
+        session_quiz_type = await service.get_session_quiz_type(active_session.id)
         payload = await service.get_current_payload(active_session.id)
-        if not payload or not settings:
+        if not payload or not settings or session_quiz_type is None:
             await message.answer("Sessiya topilmadi.")
             return
 
@@ -282,18 +289,18 @@ async def start_quiz(
         await state.update_data(
             session_id=active_session.id,
             index=active_session.current_index,
-            quiz_type=settings.quiz_type.value,
+            quiz_type=session_quiz_type.value,
             question_sent_at=datetime.utcnow().isoformat(),
         )
 
-        if settings.quiz_type == QuizType.WEBAPP:
+        if session_quiz_type == QuizType.WEBAPP:
             from core.config import settings as app_settings
             webapp_url = f"{app_settings.BASE_WEBHOOK_URL.rstrip('/')}/webapp/"
             await message.answer(
                 "Testni davom ettirish uchun quyidagi tugmani bosing:",
                 reply_markup=inline.webapp_quiz_keyboard(webapp_url),
             )
-        elif settings.quiz_type == QuizType.WEB:
+        elif session_quiz_type == QuizType.WEB:
             await message.answer(
                 _format_question(payload),
                 reply_markup=inline.quiz_keyboard(payload),
@@ -309,6 +316,7 @@ async def start_quiz(
                 settings.time_limit_seconds,
             )
         else:
+            await service.delete_session_polls(active_session.id)
             await _send_poll_question(
                 bot=bot,
                 chat_id=message.chat.id,
@@ -405,6 +413,9 @@ async def handle_web_answer(
         return
 
     await cb.answer("✅" if result.is_correct else "❌")
+    await cb.message.answer(
+        _answer_feedback_text(result.is_correct, result.correct_answer),
+    )
 
     if result.is_last:
         await state.clear()
@@ -483,6 +494,11 @@ async def handle_poll_answer(
             await bot.delete_message(poll_answer.user.id, mapping.message_id)
         except Exception as e:
             logger.warning(f"Failed to delete poll message {mapping.message_id}: {e}")
+
+        await bot.send_message(
+            poll_answer.user.id,
+            _answer_feedback_text(result.is_correct, result.correct_answer),
+        )
 
         if result.is_last:
             await bot.send_message(
