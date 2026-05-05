@@ -18,6 +18,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    op.execute("ALTER TYPE quiz_type_enum ADD VALUE IF NOT EXISTS 'web'")
+    op.execute("ALTER TYPE quiz_type_enum ADD VALUE IF NOT EXISTS 'quiz'")
+
     op.add_column(
         "kitobxon_test_sessions",
         sa.Column(
