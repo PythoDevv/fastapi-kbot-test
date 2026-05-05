@@ -85,7 +85,13 @@ def quiz_type_keyboard(current_type: str) -> InlineKeyboardMarkup:
                     text=f"{'✅ ' if current_type == 'quiz' else ''}📊 Quiz (poll)",
                     callback_data="qt:quiz",
                 ),
-            ]
+            ],
+            [
+                InlineKeyboardButton(
+                    text=f"{'✅ ' if current_type == 'webapp' else ''}🧑‍💻 WebApp (widget)",
+                    callback_data="qt:webapp",
+                ),
+            ],
         ]
     )
 
