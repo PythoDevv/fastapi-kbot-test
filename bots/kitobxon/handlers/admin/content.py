@@ -107,9 +107,9 @@ async def receive_content_text(
     if message.photo:
         # Save photo file_id
         photo = message.photo[-1]
-        text_to_save = message.caption or ""
+        text_to_save = message.html_caption or ""
         await repo.upsert(key=key, text=text_to_save, image_id=photo.file_id)
-        
+
         # Show preview
         await message.answer("✅ Rasm saqlandi. Quyida namuna:")
         await message.answer_photo(
@@ -118,16 +118,17 @@ async def receive_content_text(
             parse_mode=ParseMode.HTML,
         )
     else:
-        # Save text
-        await repo.upsert(key=key, text=message.text)
-        
+        # Save text with HTML entities preserved
+        text_to_save = message.html_text
+        await repo.upsert(key=key, text=text_to_save)
+
         # Show preview
         await message.answer(
             "<b>✅ Matn saqlandi. Quyida namuna:</b>",
             parse_mode=ParseMode.HTML,
         )
         await message.answer(
-            message.text,
+            text_to_save,
             parse_mode=ParseMode.HTML,
         )
     

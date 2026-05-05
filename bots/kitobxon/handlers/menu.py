@@ -62,10 +62,7 @@ async def referral_link(message: Message, session: AsyncSession) -> None:
     # Add referral link if content requires it or if no content exists
     should_show_link = (not content) or content.require_link
     if should_show_link:
-        text_parts.append(f"Referal havolangiz:\n{link}")
-
-    # Add referral count
-    text_parts.append(f"\nSiz taklif qilgan do'stlar soni: <b>{count}</b>")
+        text_parts.append(f"{link}")
 
     final_text = "\n\n".join(text_parts)
 
