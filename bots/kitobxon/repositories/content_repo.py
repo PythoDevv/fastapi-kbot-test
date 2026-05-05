@@ -10,6 +10,11 @@ class ContentRepository(BaseRepository[ContentText]):
     async def get_by_key(self, key: str) -> ContentText | None:
         return await self.get_by(key=key)
 
+    async def list_all(self) -> list[ContentText]:
+        from sqlalchemy import select
+        result = await self.session.execute(select(ContentText).order_by(ContentText.id))
+        return list(result.scalars().all())
+
     async def upsert(
         self,
         key: str,

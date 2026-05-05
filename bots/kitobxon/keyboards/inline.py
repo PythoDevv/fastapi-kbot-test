@@ -180,15 +180,19 @@ def admin_stats_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def content_list_keyboard() -> InlineKeyboardMarkup:
-    """Keyboard with content items to manage"""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="📝 Tanlov shartlari", callback_data="ct_manage:nizom")],
-            [InlineKeyboardButton(text="🎁 Viktorina sovg'alari", callback_data="ct_manage:prizes")],
-            [InlineKeyboardButton(text="💠 Do'stlarni taklif qilish", callback_data="ct_manage:referral")],
-        ]
+def content_list_keyboard(contents: list | None = None) -> InlineKeyboardMarkup:
+    """Keyboard with content items to manage — dynamic from DB + add button"""
+    from bots.kitobxon.models import ContentText
+    buttons = []
+    if contents:
+        for ct in contents:
+            buttons.append(
+                [InlineKeyboardButton(text=f"📝 {ct.key}", callback_data=f"ct_manage:{ct.key}")]
+            )
+    buttons.append(
+        [InlineKeyboardButton(text="➕ Yangi qo'shish", callback_data="ct_add")]
     )
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def content_manage_keyboard(key: str, require_link: bool = False) -> InlineKeyboardMarkup:

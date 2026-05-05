@@ -47,7 +47,9 @@
       "Bash(venv/bin/alembic heads *)",
       "Bash(venv/bin/alembic history *)",
       "Bash(venv/bin/alembic upgrade *)",
-      "Bash(pg_isready)"
+      "Bash(pg_isready)",
+      "Bash(venv/bin/python -c \"from bots.kitobxon.handlers.admin.content import router; print\\('OK'\\)\")",
+      "Bash(venv/bin/python -c \"from bots.kitobxon.keyboards.inline import content_list_keyboard; print\\(content_list_keyboard\\([]\\)\\)\")"
     ],
     "additionalDirectories": [
       "/tmp"

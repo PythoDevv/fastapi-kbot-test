@@ -17,47 +17,76 @@ async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
     return bool(user and user.is_admin)
 
 
-# Content keys with display names
-CONTENT_KEYS = {
-    "nizom": "📝 Tanlov shartlari",
-    "prizes": "🎁 Viktorina sovg'alari",
-    "referral": "💠 Do'stlarni taklif qilish",
-}
-
 
 @router.message(F.text == "📝 Kontentlar")
 async def show_content_list(message: Message, session: AsyncSession) -> None:
-    """Show list of content items to manage"""
     if not await _is_admin(session, message.from_user.id):
         return
-
+    contents = await ContentRepository(session).list_all()
     await message.answer(
         "<b>📝 Kontentlar Boshqaruvi</b>\n\nTahrirlaydigan kontentni tanlang:",
-        reply_markup=inline.content_list_keyboard(),
+        reply_markup=inline.content_list_keyboard(contents),
+    )
+
+
+@router.callback_query(F.data == "ct_add")
+async def start_add_content(cb: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+    await state.set_state(AdminContentStates.waiting_name)
+    await cb.message.edit_text(
+        "<b>Yangi kontent nomi</b>\n\nKontent uchun nom kiriting (masalan: <code>about</code>, <code>rules2</code>):",
+        reply_markup=inline.cancel_keyboard(),
+    )
+    await cb.answer()
+
+
+@router.callback_query(AdminContentStates.waiting_name, F.data == "cancel")
+async def cancel_add_content_name(cb: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    await state.clear()
+    contents = await ContentRepository(session).list_all()
+    await cb.message.edit_text(
+        "<b>📝 Kontentlar Boshqaruvi</b>\n\nTahrirlaydigan kontentni tanlang:",
+        reply_markup=inline.content_list_keyboard(contents),
+    )
+    await cb.answer()
+
+
+@router.message(AdminContentStates.waiting_name)
+async def receive_content_name(message: Message, state: FSMContext, session: AsyncSession) -> None:
+    name = message.text.strip().lower().replace(" ", "_")
+    if not name:
+        await message.answer("Nom bo'sh bo'lmasin.")
+        return
+    existing = await ContentRepository(session).get_by_key(name)
+    if existing:
+        await message.answer(f"<code>{name}</code> allaqachon mavjud. Boshqa nom kiriting.")
+        return
+    await state.update_data(content_key=name)
+    await state.set_state(AdminContentStates.waiting_text)
+    await message.answer(
+        f"<b>{name}</b> uchun kontent yuboring:\n"
+        "• Matn xabarini yuboring\n"
+        "• Yoki rasmli xabarni yuboring",
+        reply_markup=inline.cancel_keyboard(),
     )
 
 
 @router.callback_query(F.data.startswith("ct_manage:"))
 async def show_content_manage(cb: CallbackQuery, session: AsyncSession) -> None:
-    """Show management keyboard for a content item"""
     if not await _is_admin(session, cb.from_user.id):
         await cb.answer()
         return
 
     key = cb.data.split(":")[1]
-    if key not in CONTENT_KEYS:
-        await cb.answer("Noto'g'ri kontent!", show_alert=True)
-        return
-
     repo = ContentRepository(session)
     content = await repo.get_by_key(key)
     require_link = content.require_link if content else False
-
-    title = CONTENT_KEYS.get(key, key)
     status = "✅ Mavjud" if content and content.text else "⚠️ Bo'sh"
 
     await cb.message.edit_text(
-        f"<b>{title}</b>\n\nStatus: {status}\n\nNima qilmoqchisiz?",
+        f"<b>📝 {key}</b>\n\nStatus: {status}\n\nNima qilmoqchisiz?",
         reply_markup=inline.content_manage_keyboard(key, require_link),
     )
     await cb.answer()
@@ -65,21 +94,16 @@ async def show_content_manage(cb: CallbackQuery, session: AsyncSession) -> None:
 
 @router.callback_query(F.data.startswith("ct_edit:"))
 async def start_edit_content(cb: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
-    """Start editing content"""
     if not await _is_admin(session, cb.from_user.id):
         await cb.answer()
         return
 
     key = cb.data.split(":")[1]
-    if key not in CONTENT_KEYS:
-        await cb.answer("Noto'g'ri kontent!", show_alert=True)
-        return
-
     await state.set_state(AdminContentStates.waiting_text)
     await state.update_data(content_key=key)
 
     await cb.message.edit_text(
-        f"<b>{CONTENT_KEYS.get(key, key)}</b>\n\n"
+        f"<b>{key}</b>\n\n"
         "Tayyor kontentni yuboring:\n"
         "• Matn xabarini yuboring\n"
         "• Yoki rasmli xabarni yuboring (caption qo'shilsa bo'ladi)\n"
@@ -132,10 +156,7 @@ async def receive_content_text(
             parse_mode=ParseMode.HTML,
         )
     
-    # Ask about link requirement
-    await state.set_state(AdminContentStates.waiting_image)
-    await state.update_data(content_key=key)
-    
+    await state.clear()
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -144,11 +165,7 @@ async def receive_content_text(
             ]
         ]
     )
-    
-    await message.answer(
-        "Link ko'rsatilsinmi?",
-        reply_markup=keyboard,
-    )
+    await message.answer("Link ko'rsatilsinmi?", reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith("ct_link_yes:"))
@@ -210,16 +227,11 @@ async def receive_content_image(
 
 @router.callback_query(F.data.startswith("ct_delete:"))
 async def delete_content(cb: CallbackQuery, session: AsyncSession) -> None:
-    """Delete content item"""
     if not await _is_admin(session, cb.from_user.id):
         await cb.answer()
         return
 
     key = cb.data.split(":")[1]
-    if key not in CONTENT_KEYS:
-        await cb.answer("Noto'g'ri kontent!", show_alert=True)
-        return
-
     repo = ContentRepository(session)
     content = await repo.get_by_key(key)
 
@@ -227,56 +239,41 @@ async def delete_content(cb: CallbackQuery, session: AsyncSession) -> None:
         await cb.answer("Kontent topilmadi.", show_alert=True)
         return
 
-    # Delete by setting text to empty (soft delete approach, or can use hard delete)
-    # Here we'll delete the actual record
     await session.delete(content)
-    await session.commit()
+    await session.flush()
 
-    await cb.answer(f"✅ {CONTENT_KEYS.get(key, key)} o'chirildi.", show_alert=True)
+    await cb.answer(f"✅ {key} o'chirildi.", show_alert=True)
+    contents = await repo.list_all()
     await cb.message.edit_text(
         "<b>📝 Kontentlar Boshqaruvi</b>\n\nTahrirlaydigan kontentni tanlang:",
-        reply_markup=inline.content_list_keyboard(),
+        reply_markup=inline.content_list_keyboard(contents),
     )
 
 
 @router.callback_query(F.data == "cancel")
-async def cancel_edit_content(cb: CallbackQuery, state: FSMContext) -> None:
-    """Handle cancel button during content editing"""
+async def cancel_edit_content(cb: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
     await state.clear()
+    contents = await ContentRepository(session).list_all()
     await cb.message.edit_text(
         "<b>📝 Kontentlar Boshqaruvi</b>\n\nTahrirlaydigan kontentni tanlang:",
-        reply_markup=inline.content_list_keyboard(),
+        reply_markup=inline.content_list_keyboard(contents),
     )
     await cb.answer("Bekor qilindi.")
 
 
 @router.callback_query(F.data.startswith("ct_link:"))
 async def toggle_require_link(cb: CallbackQuery, session: AsyncSession) -> None:
-    """Toggle require_link flag for content"""
     if not await _is_admin(session, cb.from_user.id):
         await cb.answer()
         return
 
     key = cb.data.split(":")[1]
-    if key not in CONTENT_KEYS:
-        await cb.answer("Noto'g'ri kontent!", show_alert=True)
-        return
-
     repo = ContentRepository(session)
     content = await repo.get_by_key(key)
-    current_require_link = content.require_link if content else False
-    new_require_link = not current_require_link
-
-    # Upsert with new require_link value
+    new_require_link = not (content.require_link if content else False)
     await repo.upsert(key=key, require_link=new_require_link)
-
-    # Update keyboard
     await cb.message.edit_reply_markup(
         reply_markup=inline.content_manage_keyboard(key, new_require_link)
     )
-
-    link_status = "✅ Yoq'on" if new_require_link else "Bekor qilindi"
-    await cb.answer(
-        f"{CONTENT_KEYS.get(key, key)}\nLink: {link_status}",
-        show_alert=True,
-    )
+    link_status = "✅ Yoqildi" if new_require_link else "❌ O'chirildi"
+    await cb.answer(f"Link: {link_status}", show_alert=True)

@@ -30,6 +30,7 @@ class AdminZayafkaStates(StatesGroup):
 
 
 class AdminContentStates(StatesGroup):
+    waiting_name = State()
     waiting_text = State()
     waiting_image = State()
 
