@@ -292,7 +292,10 @@ async def start_quiz(
             webapp_url = f"{app_settings.BASE_WEBHOOK_URL.rstrip('/')}/webapp/"
             await message.answer(
                 "Testni davom ettirish uchun quyidagi tugmani bosing:",
-                reply_markup=inline.webapp_quiz_keyboard(webapp_url),
+                reply_markup=inline.webapp_quiz_keyboard(
+                    webapp_url,
+                    button_text="🧑‍💻 Testni davom ettirish",
+                ),
             )
         elif session_quiz_type == QuizType.WEB:
             await message.answer(
@@ -339,7 +342,10 @@ async def start_quiz(
         webapp_url = f"{app_settings.BASE_WEBHOOK_URL.rstrip('/')}/webapp/"
         await message.answer(
             "Testni boshlash uchun quyidagi tugmani bosing:",
-            reply_markup=inline.webapp_quiz_keyboard(webapp_url),
+            reply_markup=inline.webapp_quiz_keyboard(
+                webapp_url,
+                button_text="🧑‍💻 Testni boshlash",
+            ),
         )
     elif result.quiz_type == QuizType.WEB:
         await message.answer(

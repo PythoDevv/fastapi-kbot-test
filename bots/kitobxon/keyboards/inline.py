@@ -23,10 +23,13 @@ def subscription_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def webapp_quiz_keyboard(webapp_url: str) -> InlineKeyboardMarkup:
+def webapp_quiz_keyboard(
+    webapp_url: str,
+    button_text: str = "🧑‍💻 Testni boshlash",
+) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🧑‍💻 Testni boshlash", web_app=WebAppInfo(url=webapp_url))]
+            [InlineKeyboardButton(text=button_text, web_app=WebAppInfo(url=webapp_url))]
         ]
     )
 

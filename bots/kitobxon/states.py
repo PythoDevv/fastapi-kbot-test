@@ -76,3 +76,7 @@ class AdminExportStates(StatesGroup):
 class AdminReferralStates(StatesGroup):
     waiting_new_count = State()
     waiting_reason = State()
+
+
+class AdminTestResetStates(StatesGroup):
+    waiting_user_id = State()

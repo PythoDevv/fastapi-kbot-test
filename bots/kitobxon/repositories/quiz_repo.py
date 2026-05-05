@@ -138,6 +138,12 @@ class QuizRepository(BaseRepository[Question]):
         )
         return (await self.session.execute(stmt)).scalar_one_or_none() is not None
 
+    async def sum_session_scores(self, user_id: int) -> int:
+        stmt = select(func.coalesce(func.sum(TestSession.score), 0)).where(
+            TestSession.user_id == user_id
+        )
+        return int((await self.session.execute(stmt)).scalar_one() or 0)
+
     async def create_session(
         self, user_id: int, question_ids: list[int], quiz_type: QuizType
     ) -> TestSession:
@@ -191,6 +197,12 @@ class QuizRepository(BaseRepository[Question]):
         active = await self.get_active_session(user_id)
         if active:
             await self.complete_session(active.id)
+
+    async def delete_sessions_for_user(self, user_id: int) -> None:
+        await self.session.execute(
+            delete(TestSession).where(TestSession.user_id == user_id)
+        )
+        await self.session.flush()
 
     # --- Answers ---
     async def save_answer(self, answer: TestAnswer) -> TestAnswer:

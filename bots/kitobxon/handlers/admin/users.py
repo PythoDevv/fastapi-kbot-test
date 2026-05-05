@@ -5,7 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import inline, reply
 from bots.kitobxon.services import AdminService
-from bots.kitobxon.states import AdminReferralStates, AdminScoreStates, AdminUserSearchStates
+from bots.kitobxon.states import (
+    AdminReferralStates,
+    AdminScoreStates,
+    AdminTestResetStates,
+    AdminUserSearchStates,
+)
 
 router = Router(name="admin_users")
 
@@ -196,6 +201,52 @@ async def reset_test(cb: CallbackQuery, session: AsyncSession) -> None:
     target_id = int(cb.data.split(":")[1])
     await AdminService(session).reset_test(target_id)
     await cb.answer("Test reseti qilindi.", show_alert=True)
+
+
+@router.message(F.text == "🧹 Mening testimni tozalash")
+async def reset_own_test(message: Message, session: AsyncSession) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+    await AdminService(session).reset_test(message.from_user.id)
+    await message.answer(
+        "Sizning test sessionlaringiz tozalandi. Endi testni boshidan ishlashingiz mumkin.",
+        reply_markup=reply.admin_panel(),
+    )
+
+
+@router.message(F.text == "🧹 Foydalanuvchi testini tozalash")
+async def ask_reset_target(message: Message, state: FSMContext, session: AsyncSession) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+    await state.set_state(AdminTestResetStates.waiting_user_id)
+    await message.answer(
+        "Testini tozalamoqchi bo'lgan foydalanuvchi Telegram ID sini yuboring:",
+        reply_markup=reply.cancel_only(),
+    )
+
+
+@router.message(AdminTestResetStates.waiting_user_id, F.text == "Bekor qilish")
+async def cancel_reset_target(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await message.answer("Bekor qilindi.", reply_markup=reply.admin_panel())
+
+
+@router.message(AdminTestResetStates.waiting_user_id)
+async def reset_target_test(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    try:
+        target_id = int((message.text or "").strip())
+    except ValueError:
+        await message.answer("Iltimos, to'g'ri Telegram ID kiriting.")
+        return
+
+    await AdminService(session).reset_test(target_id)
+    await state.clear()
+    await message.answer(
+        f"ID {target_id} foydalanuvchi test sessionlari tozalandi.",
+        reply_markup=reply.admin_panel(),
+    )
 
 
 @router.callback_query(F.data.startswith("u_admin:"))

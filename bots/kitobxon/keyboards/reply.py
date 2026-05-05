@@ -66,6 +66,10 @@ def admin_panel() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="👥 Adminlar"),
                 KeyboardButton(text="🏠 Asosiy menyu"),
             ],
+            [
+                KeyboardButton(text="🧹 Mening testimni tozalash"),
+                KeyboardButton(text="🧹 Foydalanuvchi testini tozalash"),
+            ],
         ],
         resize_keyboard=True,
     )

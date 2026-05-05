@@ -160,10 +160,18 @@ class AdminService:
         return updated, created, skipped
 
     async def reset_test(self, target_telegram_id: int) -> None:
+        user = await self.users.get_by_telegram_id(target_telegram_id)
+        if user is None:
+            from bots.kitobxon.exceptions import UserNotFoundError
+            raise UserNotFoundError(target_telegram_id)
+
+        session_score_total = await self.quiz.sum_session_scores(user.id)
+        await self.quiz.delete_sessions_for_user(user.id)
+        new_score = max((user.score or 0) - session_score_total, 0)
         await self.users.update_fields(
             target_telegram_id,
             test_solved=False,
-            score=0,
+            score=new_score,
             certificate_received=False,
         )
 
