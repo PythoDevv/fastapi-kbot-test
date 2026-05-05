@@ -3,9 +3,11 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.config import QuizType
-from bots.kitobxon.models import Channel, Question, User, ZayafkaChannel
+from bots.kitobxon.models import ActivityBook, Channel, Question, User, ZayafkaChannel
 from bots.kitobxon.repositories import (
+    BookRepository,
     ChannelRepository,
+    ContentRepository,
     QuizRepository,
     ScoreLogRepository,
     UserRepository,
@@ -28,6 +30,8 @@ class AdminService:
         self.quiz = QuizRepository(session)
         self.channels = ChannelRepository(session)
         self.zayafka = ZayafkaRepository(session)
+        self.contents = ContentRepository(session)
+        self.books = BookRepository(session)
         self.score_log = ScoreLogRepository(session)
 
     # --- Stats ---
@@ -258,9 +262,67 @@ class AdminService:
         s = await self.quiz.ensure_settings()
         s.quiz_type = quiz_type
 
+    async def set_waiting_post(
+        self,
+        *,
+        text: str | None,
+        image_id: str | None,
+    ) -> None:
+        s = await self.quiz.ensure_settings()
+        s.waiting_text = text
+        s.image_id = image_id
+
+    async def clear_waiting_post(self) -> None:
+        s = await self.quiz.ensure_settings()
+        s.waiting_text = None
+        s.image_id = None
+
     async def toggle_require_phone(self) -> None:
         s = await self.quiz.ensure_settings()
         s.require_phone_number = not s.require_phone_number
 
     async def get_settings(self):
         return await self.quiz.ensure_settings()
+
+    # --- Dedicated content buttons ---
+    async def save_content_post(
+        self,
+        *,
+        key: str,
+        text: str | None,
+        image_id: str | None,
+        require_link: bool = False,
+    ) -> None:
+        await self.contents.replace(
+            key=key,
+            text=text,
+            image_id=image_id,
+            require_link=require_link,
+        )
+
+    async def clear_content_post(self, key: str) -> None:
+        await self.contents.clear(key)
+
+    async def delete_content_post(self, key: str) -> bool:
+        return await self.contents.delete_by_key(key)
+
+    async def add_book(
+        self,
+        *,
+        title: str,
+        button_text: str,
+        button_url: str,
+    ) -> ActivityBook:
+        return await self.books.create(
+            title=title,
+            button_text=button_text,
+            button_url=button_url,
+        )
+
+    async def list_books(self) -> list[ActivityBook]:
+        return await self.books.list_all()
+
+    async def delete_book(self, book_id: int) -> None:
+        book = await self.books.get(book_id)
+        if book:
+            await self.books.delete(book)

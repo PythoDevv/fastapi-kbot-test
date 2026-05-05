@@ -107,6 +107,12 @@ class QuizRepository(BaseRepository[Question]):
             .values(is_completed=True, completed_at=datetime.utcnow())
         )
 
+    async def abandon_active_session(self, user_id: int) -> None:
+        """Mark any active session as completed (abandoned)"""
+        active = await self.get_active_session(user_id)
+        if active:
+            await self.complete_session(active.id)
+
     # --- Answers ---
     async def save_answer(self, answer: TestAnswer) -> TestAnswer:
         self.session.add(answer)

@@ -53,6 +53,92 @@ def export_users_to_excel(users: list) -> io.BytesIO:
     return buf
 
 
+def export_referred_users_to_excel(owner, users: list) -> io.BytesIO:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Taklif qilinganlar"
+
+    ws.append(["Taklif qiluvchi", owner.fio or "", owner.telegram_id])
+    ws.append([])
+    headers = [
+        "№",
+        "Telegram ID",
+        "FIO",
+        "Username",
+        "Telefon",
+        "Ball",
+        "Ro'yxatdan o'tganmi",
+    ]
+    for col_idx, header in enumerate(headers, 1):
+        ws.cell(row=3, column=col_idx, value=header)
+
+    for row_idx, user in enumerate(users, 4):
+        ws.cell(row=row_idx, column=1, value=row_idx - 3)
+        ws.cell(row=row_idx, column=2, value=user.telegram_id)
+        ws.cell(row=row_idx, column=3, value=user.fio or "")
+        ws.cell(row=row_idx, column=4, value=f"@{user.username}" if user.username else "")
+        ws.cell(row=row_idx, column=5, value=user.mobile_number or "")
+        ws.cell(row=row_idx, column=6, value=user.score)
+        ws.cell(row=row_idx, column=7, value="Ha" if user.is_registered else "Yo'q")
+
+    col_widths = [5, 16, 30, 22, 18, 10, 18]
+    for col_idx, width in enumerate(col_widths, 1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def export_answers_to_excel(user, session, answers: list) -> io.BytesIO:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Javoblar"
+
+    ws.append(["Foydalanuvchi", user.fio or "", user.telegram_id])
+    ws.append(
+        [
+            "Natija",
+            session.score,
+            f"/{session.total_questions}",
+            "Yakunlangan",
+            session.completed_at.strftime("%Y-%m-%d %H:%M") if session.completed_at else "",
+        ]
+    )
+    ws.append([])
+
+    headers = [
+        "№",
+        "Savol",
+        "Tanlangan javob",
+        "To'g'ri javob",
+        "Natija",
+        "Timeout",
+        "Vaqt (s)",
+    ]
+    for col_idx, header in enumerate(headers, 1):
+        ws.cell(row=4, column=col_idx, value=header)
+
+    for row_idx, answer in enumerate(answers, 5):
+        ws.cell(row=row_idx, column=1, value=answer.question_index + 1)
+        ws.cell(row=row_idx, column=2, value=answer.question_text or "")
+        ws.cell(row=row_idx, column=3, value=answer.selected_answer or "")
+        ws.cell(row=row_idx, column=4, value=answer.correct_answer or "")
+        ws.cell(row=row_idx, column=5, value="To'g'ri" if answer.is_correct else "Noto'g'ri")
+        ws.cell(row=row_idx, column=6, value="Ha" if answer.is_timeout else "Yo'q")
+        ws.cell(row=row_idx, column=7, value=answer.time_taken_seconds)
+
+    col_widths = [5, 50, 28, 28, 12, 10, 10]
+    for col_idx, width in enumerate(col_widths, 1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
 def generate_questions_template() -> tuple[io.BytesIO, str]:
     """Generate template file for questions import (.xlsx with example row)"""
     wb = openpyxl.Workbook()

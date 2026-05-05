@@ -1,286 +1,299 @@
 from aiogram import F, Router
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, PhotoSize
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bots.kitobxon.keyboards import inline, reply
-from bots.kitobxon.repositories import ContentRepository
+from bots.kitobxon.keyboards import reply
+from bots.kitobxon.repositories import BookRepository
+from bots.kitobxon.services import AdminService
 from bots.kitobxon.states import AdminContentStates
 
 router = Router(name="admin_content")
 
-
-def _as_html(text: str | None, entities) -> str:
-    """Convert text + entities to HTML string."""
-    if not text:
-        return ""
-    if entities:
-        from aiogram.utils.text_decorations import html_decoration
-        return html_decoration.unparse(text, entities)
-    return text
+CONTENT_BUTTONS: dict[str, dict[str, object]] = {
+    "Test stop posti": {
+        "action": "waiting_post",
+        "title": "Test stop posti",
+        "prompt": "Test to'xtatilganda ko'rinadigan postni yuboring.",
+    },
+    "Viktorina sovg'alari qo'shish": {
+        "action": "content_post",
+        "title": "Viktorina sovg'alari posti",
+        "key": "prizes",
+        "require_link": False,
+        "prompt": "Viktorina sovg'alari uchun post yuboring.",
+    },
+    "Do'stlarni taklif post": {
+        "action": "content_post",
+        "title": "Do'stlarni taklif posti",
+        "key": "referral",
+        "require_link": True,
+        "prompt": "Do'stlarni taklif qilish bo'limi uchun post yuboring.",
+    },
+    "Tanlov shartlari post": {
+        "action": "content_post",
+        "title": "Tanlov shartlari posti",
+        "key": "nizom",
+        "require_link": False,
+        "prompt": "Tanlov shartlari uchun post yuboring.",
+    },
+}
 
 
 async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
     from bots.kitobxon.repositories import UserRepository
+
     user = await UserRepository(session).get_by_telegram_id(telegram_id)
     return bool(user and user.is_admin)
 
 
+def _as_html(text: str | None, entities) -> str:
+    if not text:
+        return ""
+    if entities:
+        from aiogram.utils.text_decorations import html_decoration
+
+        return html_decoration.unparse(text, entities)
+    return text
+
+
+async def _show_content_preview(
+    message: Message,
+    *,
+    text: str | None,
+    image_id: str | None,
+) -> None:
+    if image_id:
+        await message.answer_photo(
+            photo=image_id,
+            caption=text or "",
+            parse_mode=ParseMode.HTML,
+        )
+    else:
+        await message.answer(
+            text or "Matn saqlanmadi, faqat rasm o'rnatildi.",
+            parse_mode=ParseMode.HTML,
+        )
+
+
+def _books_delete_keyboard(books) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=f"🗑 {book.title or book.button_text or book.id}",
+                    callback_data=f"book_delete:{book.id}",
+                )
+            ]
+            for book in books
+        ]
+    )
+
 
 @router.message(F.text == "📝 Kontentlar")
-async def show_content_list(message: Message, session: AsyncSession) -> None:
+async def legacy_content_menu(message: Message, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
-    contents = await ContentRepository(session).list_all()
     await message.answer(
-        "<b>📝 Kontentlar Boshqaruvi</b>\n\nTahrirlaydigan kontentni tanlang:",
-        reply_markup=inline.content_list_keyboard(contents),
+        "<b>Test va kontent</b>\n\nKerakli amalni tanlang:",
+        reply_markup=reply.admin_content_menu(),
     )
 
 
-@router.callback_query(F.data == "ct_add")
-async def start_add_content(cb: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
-    if not await _is_admin(session, cb.from_user.id):
-        await cb.answer()
-        return
-    await state.set_state(AdminContentStates.waiting_name)
-    await cb.message.edit_text(
-        "<b>Yangi kontent nomi</b>\n\nKontent uchun nom kiriting (masalan: <code>about</code>, <code>rules2</code>):",
-        reply_markup=inline.cancel_keyboard(),
-    )
-    await cb.answer()
-
-
-@router.callback_query(AdminContentStates.waiting_name, F.data == "cancel")
-async def cancel_add_content_name(cb: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
-    await state.clear()
-    contents = await ContentRepository(session).list_all()
-    await cb.message.edit_text(
-        "<b>📝 Kontentlar Boshqaruvi</b>\n\nTahrirlaydigan kontentni tanlang:",
-        reply_markup=inline.content_list_keyboard(contents),
-    )
-    await cb.answer()
-
-
-@router.message(AdminContentStates.waiting_name)
-async def receive_content_name(message: Message, state: FSMContext, session: AsyncSession) -> None:
-    name = message.text.strip().lower().replace(" ", "_")
-    if not name:
-        await message.answer("Nom bo'sh bo'lmasin.")
-        return
-    existing = await ContentRepository(session).get_by_key(name)
-    if existing:
-        await message.answer(f"<code>{name}</code> allaqachon mavjud. Boshqa nom kiriting.")
-        return
-    await state.update_data(content_key=name)
-    await state.set_state(AdminContentStates.waiting_text)
-    await message.answer(
-        f"<b>{name}</b> uchun kontent yuboring:\n"
-        "• Matn xabarini yuboring\n"
-        "• Yoki rasmli xabarni yuboring",
-        reply_markup=inline.cancel_keyboard(),
-    )
-
-
-@router.callback_query(F.data.startswith("ct_manage:"))
-async def show_content_manage(cb: CallbackQuery, session: AsyncSession) -> None:
-    if not await _is_admin(session, cb.from_user.id):
-        await cb.answer()
-        return
-
-    key = cb.data.split(":")[1]
-    repo = ContentRepository(session)
-    content = await repo.get_by_key(key)
-    require_link = content.require_link if content else False
-    status = "✅ Mavjud" if content and content.text else "⚠️ Bo'sh"
-
-    await cb.message.edit_text(
-        f"<b>📝 {key}</b>\n\nStatus: {status}\n\nNima qilmoqchisiz?",
-        reply_markup=inline.content_manage_keyboard(key, require_link),
-    )
-    await cb.answer()
-
-
-@router.callback_query(F.data.startswith("ct_edit:"))
-async def start_edit_content(cb: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
-    if not await _is_admin(session, cb.from_user.id):
-        await cb.answer()
-        return
-
-    key = cb.data.split(":")[1]
-    await state.set_state(AdminContentStates.waiting_text)
-    await state.update_data(content_key=key)
-
-    await cb.message.edit_text(
-        f"<b>{key}</b>\n\n"
-        "Tayyor kontentni yuboring:\n"
-        "• Matn xabarini yuboring\n"
-        "• Yoki rasmli xabarni yuboring (caption qo'shilsa bo'ladi)\n"
-        "• Yoki forwarded xabar yuboring",
-        reply_markup=inline.cancel_keyboard(),
-    )
-    await cb.answer()
-
-
-@router.message(AdminContentStates.waiting_text)
-async def receive_content_text(
+@router.message(F.text.in_(set(CONTENT_BUTTONS)))
+async def start_content_post(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
-    """Receive and save content (any type: text, photo, etc.)"""
+    if not await _is_admin(session, message.from_user.id):
+        return
+
+    config = CONTENT_BUTTONS[message.text]
+    await state.set_state(AdminContentStates.waiting_content_message)
+    await state.update_data(**config)
+    await message.answer(
+        f"<b>{config['title']}</b>\n\n{config['prompt']}\n\n"
+        "Matn yoki rasmli xabar yuboring.",
+        reply_markup=reply.cancel_only(),
+    )
+
+
+@router.message(AdminContentStates.waiting_content_message, F.text == "Bekor qilish")
+async def cancel_content_message(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    await state.clear()
+    await message.answer("Bekor qilindi.", reply_markup=reply.admin_content_menu())
+
+
+@router.message(AdminContentStates.waiting_content_message)
+async def save_content_message(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
     if not message.text and not message.photo:
         await message.answer("Iltimos, matn yoki rasm yuboring.")
         return
 
     data = await state.get_data()
-    key = data.get("content_key")
-    
-    # Save the message content
-    repo = ContentRepository(session)
-    
-    if message.photo:
-        photo = message.photo[-1]
-        text_to_save = _as_html(message.caption, message.caption_entities)
-        await repo.upsert(key=key, text=text_to_save, image_id=photo.file_id)
-
-        await message.answer("✅ Rasm saqlandi. Quyida namuna:")
-        await message.answer_photo(
-            photo=photo.file_id,
-            caption=text_to_save,
-            parse_mode=ParseMode.HTML,
-        )
-    else:
-        text_to_save = _as_html(message.text, message.entities)
-        await repo.upsert(key=key, text=text_to_save)
-
-        # Show preview
-        await message.answer(
-            "<b>✅ Matn saqlandi. Quyida namuna:</b>",
-            parse_mode=ParseMode.HTML,
-        )
-        await message.answer(
-            text_to_save,
-            parse_mode=ParseMode.HTML,
-        )
-    
-    await state.clear()
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="✅ Ha (Link ko'rsatish)", callback_data=f"ct_link_yes:{key}"),
-                InlineKeyboardButton(text="❌ Yo'q (Link ko'rsatmaslik)", callback_data=f"ct_link_no:{key}"),
-            ]
-        ]
+    service = AdminService(session)
+    image_id = message.photo[-1].file_id if message.photo else None
+    text = _as_html(
+        message.caption if message.photo else message.text,
+        message.caption_entities if message.photo else message.entities,
     )
-    await message.answer("Link ko'rsatilsinmi?", reply_markup=keyboard)
 
+    if data["action"] == "waiting_post":
+        await service.set_waiting_post(text=text, image_id=image_id)
+    else:
+        await service.save_content_post(
+            key=str(data["key"]),
+            text=text,
+            image_id=image_id,
+            require_link=bool(data.get("require_link", False)),
+        )
 
-@router.callback_query(F.data.startswith("ct_link_yes:"))
-async def handle_link_yes(cb: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
-    """Handle link yes response"""
-    key = cb.data.split(":")[1]
-    repo = ContentRepository(session)
-    await repo.upsert(key=key, require_link=True)
-    
     await state.clear()
-    await cb.message.edit_text("✅ Saqlandi! Link ko'rsatiladi.")
-    await cb.answer()
+    await message.answer("✅ Saqlandi. Quyida namuna:", reply_markup=reply.admin_content_menu())
+    await _show_content_preview(message, text=text, image_id=image_id)
 
 
-@router.callback_query(F.data.startswith("ct_link_no:"))
-async def handle_link_no(cb: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
-    """Handle link no response"""
-    key = cb.data.split(":")[1]
-    repo = ContentRepository(session)
-    await repo.upsert(key=key, require_link=False)
-    
-    await state.clear()
-    await cb.message.edit_text("✅ Saqlandi! Link ko'rsatilmaydi.")
-    await cb.answer()
+@router.message(F.text == "Test stop postini o'chirish")
+async def clear_waiting_post(message: Message, session: AsyncSession) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+    await AdminService(session).clear_waiting_post()
+    await message.answer("✅ Test stop posti tozalandi.", reply_markup=reply.admin_content_menu())
 
 
-@router.message(AdminContentStates.waiting_image)
-async def receive_content_image(
+@router.message(F.text == "Viktorina sovg'alari postini o'chirish")
+async def delete_prizes_post(message: Message, session: AsyncSession) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+    deleted = await AdminService(session).delete_content_post("prizes")
+    text = "✅ Viktorina sovg'alari posti o'chirildi." if deleted else "Post topilmadi."
+    await message.answer(text, reply_markup=reply.admin_content_menu())
+
+
+@router.message(F.text == "Do'stlarni taklif postini o'chirish")
+async def delete_referral_post(message: Message, session: AsyncSession) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+    deleted = await AdminService(session).delete_content_post("referral")
+    text = "✅ Do'stlarni taklif posti o'chirildi." if deleted else "Post topilmadi."
+    await message.answer(text, reply_markup=reply.admin_content_menu())
+
+
+@router.message(F.text == "Taklif postlarini tozalash")
+async def clear_referral_post(message: Message, session: AsyncSession) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+    service = AdminService(session)
+    await service.clear_content_post("referral")
+    await service.save_content_post(
+        key="referral",
+        text=None,
+        image_id=None,
+        require_link=True,
+    )
+    await message.answer("✅ Taklif posti tozalandi.", reply_markup=reply.admin_content_menu())
+
+
+@router.message(F.text == "Tanlov shartlari postini o'chirish")
+async def delete_rules_post(message: Message, session: AsyncSession) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+    deleted = await AdminService(session).delete_content_post("nizom")
+    text = "✅ Tanlov shartlari posti o'chirildi." if deleted else "Post topilmadi."
+    await message.answer(text, reply_markup=reply.admin_content_menu())
+
+
+@router.message(F.text == "Kitob qo'shish")
+async def start_book_add(message: Message, state: FSMContext, session: AsyncSession) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+    await state.set_state(AdminContentStates.waiting_book_title)
+    await message.answer(
+        "Kitob sarlavhasini yuboring:",
+        reply_markup=reply.cancel_only(),
+    )
+
+
+@router.message(AdminContentStates.waiting_book_title, F.text == "Bekor qilish")
+@router.message(AdminContentStates.waiting_book_button_text, F.text == "Bekor qilish")
+@router.message(AdminContentStates.waiting_book_button_url, F.text == "Bekor qilish")
+async def cancel_book_flow(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
-    """Receive and save content image"""
-    if message.text == "Bekor qilish":
-        await state.clear()
-        await message.answer("Bekor qilindi.", reply_markup=reply.admin_panel())
+    await state.clear()
+    await message.answer("Bekor qilindi.", reply_markup=reply.admin_content_menu())
+
+
+@router.message(AdminContentStates.waiting_book_title)
+async def receive_book_title(message: Message, state: FSMContext) -> None:
+    title = (message.text or "").strip()
+    if not title:
+        await message.answer("Sarlavha bo'sh bo'lmasin.")
+        return
+    await state.update_data(book_title=title)
+    await state.set_state(AdminContentStates.waiting_book_button_text)
+    await message.answer("Tugma matnini yuboring:")
+
+
+@router.message(AdminContentStates.waiting_book_button_text)
+async def receive_book_button_text(message: Message, state: FSMContext) -> None:
+    button_text = (message.text or "").strip()
+    if not button_text:
+        await message.answer("Tugma matni bo'sh bo'lmasin.")
+        return
+    await state.update_data(book_button_text=button_text)
+    await state.set_state(AdminContentStates.waiting_book_button_url)
+    await message.answer("Tugma URL manzilini yuboring:")
+
+
+@router.message(AdminContentStates.waiting_book_button_url)
+async def receive_book_button_url(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    button_url = (message.text or "").strip()
+    if not button_url.startswith(("http://", "https://")):
+        await message.answer("URL http:// yoki https:// bilan boshlansin.")
         return
 
-    if message.text == "o'tkazib yuborish":
-        # Skip image
-        await state.clear()
-        await message.answer("✅ Kontent saqlandi!", reply_markup=reply.admin_panel())
-        return
-
-    if not message.photo:
-        await message.answer("Iltimos, rasm yuboring yoki 'o'tkazib yuborish' tugmasini bosing.")
-        return
-
-    # Get the largest photo size
-    photo: PhotoSize = message.photo[-1]
     data = await state.get_data()
-    key = data.get("content_key")
-
-    # Save image to DB
-    repo = ContentRepository(session)
-    await repo.upsert(key=key, image_id=photo.file_id)
-
+    await AdminService(session).add_book(
+        title=data["book_title"],
+        button_text=data["book_button_text"],
+        button_url=button_url,
+    )
     await state.clear()
-    await message.answer("✅ Kontent rasm bilan saqlandi!", reply_markup=reply.admin_panel())
+    await message.answer("✅ Kitob qo'shildi.", reply_markup=reply.admin_content_menu())
 
 
-@router.callback_query(F.data.startswith("ct_delete:"))
-async def delete_content(cb: CallbackQuery, session: AsyncSession) -> None:
+@router.message(F.text == "Kitoblarni o'chirish")
+async def show_books_delete(message: Message, session: AsyncSession) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+    books = await BookRepository(session).list_all()
+    if not books:
+        await message.answer("Hozircha kitoblar yo'q.", reply_markup=reply.admin_content_menu())
+        return
+    await message.answer(
+        "O'chirmoqchi bo'lgan kitobni tanlang:",
+        reply_markup=_books_delete_keyboard(books),
+    )
+
+
+@router.callback_query(F.data.startswith("book_delete:"))
+async def delete_book(cb: CallbackQuery, session: AsyncSession) -> None:
     if not await _is_admin(session, cb.from_user.id):
         await cb.answer()
         return
-
-    key = cb.data.split(":")[1]
-    repo = ContentRepository(session)
-    content = await repo.get_by_key(key)
-
-    if not content:
-        await cb.answer("Kontent topilmadi.", show_alert=True)
-        return
-
-    await session.delete(content)
-    await session.flush()
-
-    await cb.answer(f"✅ {key} o'chirildi.", show_alert=True)
-    contents = await repo.list_all()
-    await cb.message.edit_text(
-        "<b>📝 Kontentlar Boshqaruvi</b>\n\nTahrirlaydigan kontentni tanlang:",
-        reply_markup=inline.content_list_keyboard(contents),
-    )
-
-
-@router.callback_query(F.data == "cancel")
-async def cancel_edit_content(cb: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
-    await state.clear()
-    contents = await ContentRepository(session).list_all()
-    await cb.message.edit_text(
-        "<b>📝 Kontentlar Boshqaruvi</b>\n\nTahrirlaydigan kontentni tanlang:",
-        reply_markup=inline.content_list_keyboard(contents),
-    )
-    await cb.answer("Bekor qilindi.")
-
-
-@router.callback_query(F.data.startswith("ct_link:"))
-async def toggle_require_link(cb: CallbackQuery, session: AsyncSession) -> None:
-    if not await _is_admin(session, cb.from_user.id):
-        await cb.answer()
-        return
-
-    key = cb.data.split(":")[1]
-    repo = ContentRepository(session)
-    content = await repo.get_by_key(key)
-    new_require_link = not (content.require_link if content else False)
-    await repo.upsert(key=key, require_link=new_require_link)
-    await cb.message.edit_reply_markup(
-        reply_markup=inline.content_manage_keyboard(key, new_require_link)
-    )
-    link_status = "✅ Yoqildi" if new_require_link else "❌ O'chirildi"
-    await cb.answer(f"Link: {link_status}", show_alert=True)
+    book_id = int(cb.data.split(":")[1])
+    service = AdminService(session)
+    await service.delete_book(book_id)
+    books = await service.list_books()
+    if books:
+        await cb.message.edit_reply_markup(reply_markup=_books_delete_keyboard(books))
+    else:
+        await cb.message.edit_text("Barcha kitoblar o'chirildi.")
+    await cb.answer("Kitob o'chirildi.")

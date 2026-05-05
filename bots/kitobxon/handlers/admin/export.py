@@ -10,10 +10,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import reply
 from bots.kitobxon.models import User
-from bots.kitobxon.repositories import UserRepository
+from bots.kitobxon.repositories import QuizRepository, UserRepository
 from bots.kitobxon.services import AdminService
-from bots.kitobxon.states import AdminImportStates
-from bots.kitobxon.utils.excel import export_users_to_excel, import_users_from_excel
+from bots.kitobxon.states import AdminExportStates, AdminImportStates
+from bots.kitobxon.utils.excel import (
+    export_answers_to_excel,
+    export_referred_users_to_excel,
+    export_users_to_excel,
+    import_users_from_excel,
+)
 
 router = Router(name="admin_export")
 
@@ -23,7 +28,7 @@ async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
     return bool(user and user.is_admin)
 
 
-@router.message(F.text == "📥 Excel yuklash")
+@router.message(F.text.in_({"📥 Excel yuklash", "📩 Excel yuklash"}))
 async def export_users(message: Message, session: AsyncSession) -> None:
     """Export registered users to Excel"""
     if not await _is_admin(session, message.from_user.id):
@@ -38,6 +43,100 @@ async def export_users(message: Message, session: AsyncSession) -> None:
     await message.answer_document(
         document=BufferedInputFile(buf.read(), filename="users.xlsx"),
         caption=f"Jami: {len(users)} foydalanuvchi",
+    )
+
+
+@router.message(F.text == "📋 Taklif qilinganlar")
+async def ask_referral_owner(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+    await state.set_state(AdminExportStates.waiting_referral_id)
+    await message.answer(
+        "Taklif qilgan foydalanuvchining Telegram ID sini yuboring:",
+        reply_markup=reply.cancel_only(),
+    )
+
+
+@router.message(AdminExportStates.waiting_referral_id)
+async def export_referred_users(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    if message.text == "Bekor qilish":
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=reply.admin_panel())
+        return
+
+    try:
+        telegram_id = int((message.text or "").strip())
+    except ValueError:
+        await message.answer("Iltimos, Telegram ID ni raqam ko'rinishida yuboring.")
+        return
+
+    repo = UserRepository(session)
+    owner = await repo.get_by_telegram_id(telegram_id)
+    if owner is None:
+        await message.answer("Foydalanuvchi topilmadi.")
+        return
+
+    referred_users = await repo.list_referred_users(telegram_id)
+    buf = export_referred_users_to_excel(owner, referred_users)
+    await state.clear()
+    await message.answer_document(
+        document=BufferedInputFile(buf.read(), filename=f"taklif_qilinganlar_{telegram_id}.xlsx"),
+        caption=f"{owner.fio or telegram_id} tomonidan taklif qilinganlar: {len(referred_users)} ta",
+        reply_markup=reply.admin_panel(),
+    )
+
+
+@router.message(F.text == "Javoblarni olish")
+async def ask_answers_owner(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+    await state.set_state(AdminExportStates.waiting_answers_id)
+    await message.answer(
+        "Javoblarini olish uchun foydalanuvchining Telegram ID sini yuboring:",
+        reply_markup=reply.cancel_only(),
+    )
+
+
+@router.message(AdminExportStates.waiting_answers_id)
+async def export_user_answers(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    if message.text == "Bekor qilish":
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=reply.admin_panel())
+        return
+
+    try:
+        telegram_id = int((message.text or "").strip())
+    except ValueError:
+        await message.answer("Iltimos, Telegram ID ni raqam ko'rinishida yuboring.")
+        return
+
+    user_repo = UserRepository(session)
+    quiz_repo = QuizRepository(session)
+    user = await user_repo.get_by_telegram_id(telegram_id)
+    if user is None:
+        await message.answer("Foydalanuvchi topilmadi.")
+        return
+
+    completed_session = await quiz_repo.get_completed_session(user.id)
+    if completed_session is None:
+        await message.answer("Bu foydalanuvchi uchun yakunlangan test topilmadi.")
+        return
+
+    answers = await quiz_repo.get_session_answers(completed_session.id)
+    buf = export_answers_to_excel(user, completed_session, answers)
+    await state.clear()
+    await message.answer_document(
+        document=BufferedInputFile(buf.read(), filename=f"javoblar_{telegram_id}.xlsx"),
+        caption=f"{user.fio or telegram_id} javoblari eksport qilindi.",
+        reply_markup=reply.admin_panel(),
     )
 
 

@@ -5,6 +5,7 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import inline, reply
+from bots.kitobxon.repositories import QuizRepository
 from bots.kitobxon.services import AuthService, SubsService
 from bots.kitobxon.states import AuthStates
 from core.logging import get_logger
@@ -18,6 +19,11 @@ async def cmd_start(
     message: Message, state: FSMContext, session: AsyncSession, bot: Bot
 ) -> None:
     await state.clear()
+    
+    # Abandon any active quiz session
+    quiz_repo = QuizRepository(session)
+    await quiz_repo.abandon_active_session(message.from_user.id)
+    
     auth = AuthService(session)
     result = await auth.touch_user(
         telegram_id=message.from_user.id,

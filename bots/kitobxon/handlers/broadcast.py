@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 router = Router(name="broadcast")
 
 
-@router.message(F.text == "📢 Broadcast")
+@router.message(F.text.in_({"📢 Broadcast", "Reklama jo'natish"}))
 async def broadcast_start(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:

@@ -43,31 +43,83 @@ def admin_panel() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [
-                KeyboardButton(text="📊 Statistika"),
-                KeyboardButton(text="👥 Foydalanuvchilar"),
+                KeyboardButton(text="Reklama jo'natish"),
+                KeyboardButton(text="📩 Excel yuklash"),
             ],
             [
-                KeyboardButton(text="📢 Broadcast"),
-                KeyboardButton(text="❓ Savollar"),
+                KeyboardButton(text="📋 Taklif qilinganlar"),
+                KeyboardButton(text="Javoblarni olish"),
             ],
             [
-                KeyboardButton(text="📡 Kanallar"),
-                KeyboardButton(text="🔗 Zayafka kanallar"),
+                KeyboardButton(text="Savol yuklash 📥"),
+                KeyboardButton(text="Namuna olish 📄"),
             ],
             [
-                KeyboardButton(text="⚙️ Test sozlamalari"),
-                KeyboardButton(text="📥 Excel yuklash"),
-            ],
-            [
-                KeyboardButton(text="👥 Adminlar"),
+                KeyboardButton(text="Savolni export qilish 📤"),
                 KeyboardButton(text="Userlarni import 📤"),
             ],
             [
-                KeyboardButton(text="📝 Kontentlar"),
+                KeyboardButton(text="Kanallar 📈"),
+                KeyboardButton(text="Test va kontent"),
             ],
             [
+                KeyboardButton(text="👥 Adminlar"),
                 KeyboardButton(text="🏠 Asosiy menyu"),
             ],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def admin_channels_menu() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text="Kanal +"),
+                KeyboardButton(text="Kanal -"),
+            ],
+            [KeyboardButton(text="Kanallar 📈")],
+            [
+                KeyboardButton(text="Yopiq kanal qo'shish"),
+                KeyboardButton(text="Yopiq kanal o'chirish"),
+            ],
+            [KeyboardButton(text="Yopiq kanallar ro'yxati")],
+            [KeyboardButton(text="🔙 Admin panel")],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def admin_content_menu() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text="Testni stop qilish"),
+                KeyboardButton(text="Testni start qilish"),
+            ],
+            [
+                KeyboardButton(text="Test stop posti"),
+                KeyboardButton(text="Test stop postini o'chirish"),
+            ],
+            [
+                KeyboardButton(text="Kitob qo'shish"),
+                KeyboardButton(text="Kitoblarni o'chirish"),
+            ],
+            [
+                KeyboardButton(text="Viktorina sovg'alari qo'shish"),
+                KeyboardButton(text="Viktorina sovg'alari postini o'chirish"),
+            ],
+            [
+                KeyboardButton(text="Do'stlarni taklif post"),
+                KeyboardButton(text="Do'stlarni taklif postini o'chirish"),
+            ],
+            [KeyboardButton(text="Taklif postlarini tozalash")],
+            [
+                KeyboardButton(text="Tanlov shartlari post"),
+                KeyboardButton(text="Tanlov shartlari postini o'chirish"),
+            ],
+            [KeyboardButton(text="⚙️ Test sozlamalari")],
+            [KeyboardButton(text="🔙 Admin panel")],
         ],
         resize_keyboard=True,
     )

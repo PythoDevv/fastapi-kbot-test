@@ -20,7 +20,7 @@ async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
     return bool(user and user.is_admin)
 
 
-@router.message(F.text == "❓ Savollar")
+@router.message(F.text.in_({"❓ Savollar", "Savollar ro'yxati"}))
 async def questions_menu(message: Message, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
@@ -45,6 +45,20 @@ async def export_questions(cb: CallbackQuery, session: AsyncSession) -> None:
         caption=f"Jami: {len(questions)} savol",
     )
     await cb.answer()
+
+
+@router.message(F.text == "Savolni export qilish 📤")
+async def export_questions_message(message: Message, session: AsyncSession) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+    from bots.kitobxon.utils.excel import export_questions_to_excel
+
+    questions = await AdminService(session).list_questions()
+    buf = export_questions_to_excel(questions)
+    await message.answer_document(
+        document=BufferedInputFile(buf.read(), filename="savollar.xlsx"),
+        caption=f"Jami: {len(questions)} savol",
+    )
 
 
 @router.callback_query(F.data.startswith("q_del:"))
@@ -76,6 +90,19 @@ async def download_template(cb: CallbackQuery, session: AsyncSession) -> None:
     await cb.answer()
 
 
+@router.message(F.text == "Namuna olish 📄")
+async def download_template_message(message: Message, session: AsyncSession) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+    from bots.kitobxon.utils.excel import generate_questions_template
+
+    buf, ext = generate_questions_template()
+    await message.answer_document(
+        document=BufferedInputFile(buf.read(), filename=f"savollar_namuna.{ext}"),
+        caption="📄 Savollar uchun namuna fayl.\n\nIltimos, ushbu formatda to'ldirib, qayta yuklang.",
+    )
+
+
 @router.callback_query(F.data == "q_add")
 async def start_add_question(
     cb: CallbackQuery, state: FSMContext, session: AsyncSession
@@ -96,7 +123,11 @@ async def cancel_q_text(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminQuestionStates.waiting_text)
 async def q_text(message: Message, state: FSMContext) -> None:
-    await state.update_data(q_text=message.text.strip())
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("Savol matnini yuboring.")
+        return
+    await state.update_data(q_text=text)
     await state.set_state(AdminQuestionStates.waiting_correct)
     await message.answer("To'g'ri javobni kiriting:", reply_markup=reply.cancel_only())
 
@@ -109,7 +140,11 @@ async def cancel_q_correct(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminQuestionStates.waiting_correct)
 async def q_correct(message: Message, state: FSMContext) -> None:
-    await state.update_data(q_correct=message.text.strip())
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("To'g'ri javobni yuboring.")
+        return
+    await state.update_data(q_correct=text)
     await state.set_state(AdminQuestionStates.waiting_wrong_1)
     await message.answer("1-noto'g'ri javobni kiriting:", reply_markup=reply.cancel_only())
 
@@ -122,7 +157,11 @@ async def cancel_q_wrong1(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminQuestionStates.waiting_wrong_1)
 async def q_wrong1(message: Message, state: FSMContext) -> None:
-    await state.update_data(q_wrong1=message.text.strip())
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("1-noto'g'ri javobni yuboring.")
+        return
+    await state.update_data(q_wrong1=text)
     await state.set_state(AdminQuestionStates.waiting_wrong_2)
     await message.answer("2-noto'g'ri javobni kiriting:", reply_markup=reply.cancel_only())
 
@@ -135,7 +174,11 @@ async def cancel_q_wrong2(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminQuestionStates.waiting_wrong_2)
 async def q_wrong2(message: Message, state: FSMContext) -> None:
-    await state.update_data(q_wrong2=message.text.strip())
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("2-noto'g'ri javobni yuboring.")
+        return
+    await state.update_data(q_wrong2=text)
     await state.set_state(AdminQuestionStates.waiting_wrong_3)
     await message.answer("3-noto'g'ri javobni kiriting:", reply_markup=reply.cancel_only())
 
@@ -148,7 +191,11 @@ async def cancel_q_wrong3(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminQuestionStates.waiting_wrong_3)
 async def q_wrong3(message: Message, state: FSMContext) -> None:
-    await state.update_data(q_wrong3=message.text.strip())
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("3-noto'g'ri javobni yuboring.")
+        return
+    await state.update_data(q_wrong3=text)
     data = await state.get_data()
 
     # Show confirmation message
@@ -201,6 +248,21 @@ async def start_import_questions(
         reply_markup=reply.cancel_only(),
     )
     await cb.answer()
+
+
+@router.message(F.text == "Savol yuklash 📥")
+async def start_import_questions_message(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+    await state.set_state(AdminQuestionImportStates.waiting_file)
+    await message.answer(
+        "<b>📥 Savollar faylini yuklang</b>\n\n"
+        "Format: .xlsx yoki .csv\n"
+        "Ustunlar: Savol, To'g'ri javob, Noto'g'ri 1, Noto'g'ri 2, Noto'g'ri 3",
+        reply_markup=reply.cancel_only(),
+    )
 
 
 @router.message(AdminQuestionImportStates.waiting_file, F.text == "Bekor qilish")

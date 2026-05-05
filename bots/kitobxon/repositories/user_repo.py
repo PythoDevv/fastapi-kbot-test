@@ -64,6 +64,14 @@ class UserRepository(BaseRepository[User]):
         stmt = select(User.telegram_id).where(User.is_registered.is_(True))
         return list((await self.session.execute(stmt)).scalars().all())
 
+    async def list_referred_users(self, referrer_telegram_id: int) -> list[User]:
+        stmt = (
+            select(User)
+            .where(User.referred_by == referrer_telegram_id)
+            .order_by(User.id)
+        )
+        return list((await self.session.execute(stmt)).scalars().all())
+
     async def count_registered(self) -> int:
         return await self.count(is_registered=True)
 

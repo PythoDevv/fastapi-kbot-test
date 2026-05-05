@@ -69,7 +69,7 @@ async def add_admin_confirm(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
     try:
-        telegram_id = int(message.text.strip())
+        telegram_id = int((message.text or "").strip())
     except ValueError:
         await message.answer("Iltimos, to'g'ri ID kiriting (faqat raqamlar):")
         return

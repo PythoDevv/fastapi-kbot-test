@@ -17,14 +17,37 @@ async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
     return bool(user and user.is_admin)
 
 
+async def _show_admin_home(message: Message, session: AsyncSession) -> None:
+    stats = await AdminService(session).get_stats()
+    await message.answer(
+        "🛠 <b>Admin Panel</b>\n\nQuyidagi bo'limlardan birini tanlang:",
+        reply_markup=reply.admin_panel(),
+    )
+    await message.answer(
+        f"<b>📈 Statistika:</b>\n"
+        f"Jami foydalanuvchilar: <b>{stats.total_users}</b>\n"
+        f"Ro'yxatdan o'tganlar: <b>{stats.registered_users}</b>\n"
+        f"Test yechganlar: <b>{stats.solved_users}</b>\n"
+        f"Savollar soni: <b>{stats.total_questions}</b>",
+        reply_markup=inline.admin_stats_keyboard(),
+    )
+
+
 @router.message(Command("admin"))
+@router.message(F.text == "🔙 Admin panel")
 async def cmd_admin(message: Message, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
-    await message.answer("🛠 Admin Panel", reply_markup=reply.admin_panel())
+    await _show_admin_home(message, session)
+
+
+@router.message(F.text == "Test va kontent")
+async def open_content_menu(message: Message, session: AsyncSession) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
     await message.answer(
-        "<b>📈 Statistika:</b>",
-        reply_markup=inline.admin_stats_keyboard(),
+        "<b>Test va kontent</b>\n\nKerakli amalni tanlang:",
+        reply_markup=reply.admin_content_menu(),
     )
 
 

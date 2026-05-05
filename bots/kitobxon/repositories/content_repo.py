@@ -36,6 +36,41 @@ class ContentRepository(BaseRepository[ContentText]):
         await self.session.flush()
         return obj
 
+    async def replace(
+        self,
+        key: str,
+        *,
+        text: str | None,
+        image_id: str | None,
+        require_link: bool,
+    ) -> ContentText:
+        obj = await self.get_by_key(key)
+        if obj is None:
+            obj = ContentText(key=key)
+            self.session.add(obj)
+        obj.text = text
+        obj.image_id = image_id
+        obj.require_link = require_link
+        await self.session.flush()
+        return obj
+
+    async def clear(self, key: str) -> ContentText:
+        obj = await self.get_by_key(key)
+        if obj is None:
+            obj = ContentText(key=key)
+            self.session.add(obj)
+        obj.text = None
+        obj.image_id = None
+        await self.session.flush()
+        return obj
+
+    async def delete_by_key(self, key: str) -> bool:
+        obj = await self.get_by_key(key)
+        if obj is None:
+            return False
+        await self.delete(obj)
+        return True
+
 
 class BookRepository(BaseRepository[ActivityBook]):
     model = ActivityBook
@@ -46,6 +81,24 @@ class BookRepository(BaseRepository[ActivityBook]):
             .scalars()
             .all()
         )
+
+    async def create(
+        self,
+        *,
+        title: str | None,
+        button_text: str | None,
+        button_url: str | None,
+        file_id: str | None = None,
+    ) -> ActivityBook:
+        book = ActivityBook(
+            title=title,
+            button_text=button_text,
+            button_url=button_url,
+            file_id=file_id,
+        )
+        self.session.add(book)
+        await self.session.flush()
+        return book
 
 
 class ScoreLogRepository(BaseRepository[ScoreChangeLog]):

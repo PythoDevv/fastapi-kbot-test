@@ -15,6 +15,16 @@ async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
     return bool(user and user.is_admin)
 
 
+def _require_phone_enabled(settings_obj) -> bool:
+    return bool(
+        getattr(
+            settings_obj,
+            "require_phone_number",
+            getattr(settings_obj, "require_phone", False),
+        )
+    )
+
+
 @router.message(F.text == "⚙️ Test sozlamalari")
 async def show_settings(message: Message, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
@@ -23,7 +33,7 @@ async def show_settings(message: Message, session: AsyncSession) -> None:
     status = "🟢 Faol" if s.active and not s.waiting and not s.finished else (
         "🟡 Kutmoqda" if s.waiting else "🔴 Yakunlangan"
     )
-    phone_status = "✅ Talab" if s.require_phone_number else "❌ Ixtiyoriy"
+    phone_status = "✅ Talab" if _require_phone_enabled(s) else "❌ Ixtiyoriy"
     await message.answer(
         f"<b>⚙️ Test sozlamalari</b>\n\n"
         f"Status: {status}\n"
@@ -36,7 +46,7 @@ async def show_settings(message: Message, session: AsyncSession) -> None:
             s.active,
             s.waiting,
             s.finished,
-            s.require_phone,
+            _require_phone_enabled(s),
             s.quiz_type.value,
         ),
     )
@@ -67,7 +77,7 @@ async def toggle_quiz_status(cb: CallbackQuery, session: AsyncSession) -> None:
     status = "🟢 Faol" if s.active and not s.waiting and not s.finished else (
         "🟡 Kutmoqda" if s.waiting else "🔴 Yakunlangan"
     )
-    phone_status = "✅ Talab" if s.require_phone_number else "❌ Ixtiyoriy"
+    phone_status = "✅ Talab" if _require_phone_enabled(s) else "❌ Ixtiyoriy"
     await cb.message.edit_text(
         f"<b>⚙️ Test sozlamalari</b>\n\n"
         f"Status: {status}\n"
@@ -80,7 +90,7 @@ async def toggle_quiz_status(cb: CallbackQuery, session: AsyncSession) -> None:
             s.active,
             s.waiting,
             s.finished,
-            s.require_phone,
+            _require_phone_enabled(s),
             s.quiz_type.value,
         )
     )
@@ -105,14 +115,14 @@ async def set_quiz_type(cb: CallbackQuery, session: AsyncSession) -> None:
             s.active,
             s.waiting,
             s.finished,
-            s.require_phone,
+            _require_phone_enabled(s),
             s.quiz_type.value,
         )
     )
     await cb.answer(f"Test turi: {quiz_type.value.upper()}", show_alert=True)
 
 
-@router.message(F.text.in_({"⏸ Testni to'xtatish", "/quiz_wait"}))
+@router.message(F.text.in_({"⏸ Testni to'xtatish", "/quiz_wait", "Testni stop qilish"}))
 async def set_waiting(message: Message, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
@@ -120,7 +130,7 @@ async def set_waiting(message: Message, session: AsyncSession) -> None:
     await message.answer("Test to'xtatildi (waiting mode).")
 
 
-@router.message(F.text.in_({"▶️ Testni boshlash", "/quiz_start"}))
+@router.message(F.text.in_({"▶️ Testni boshlash", "/quiz_start", "Testni start qilish"}))
 async def set_active(message: Message, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
@@ -146,14 +156,14 @@ async def toggle_phone_setting(cb: CallbackQuery, session: AsyncSession) -> None
     service = AdminService(session)
     await service.toggle_require_phone()
     s = await service.get_settings()
-    phone_status = "✅ Talab" if s.require_phone_number else "❌ Ixtiyoriy"
+    phone_status = "✅ Talab" if _require_phone_enabled(s) else "❌ Ixtiyoriy"
     await cb.answer(f"Telefon: {phone_status}")
     await cb.message.edit_reply_markup(
         reply_markup=inline.quiz_settings_full_keyboard(
             s.active,
             s.waiting,
             s.finished,
-            s.require_phone_number,
+            _require_phone_enabled(s),
             s.quiz_type.value,
         )
     )

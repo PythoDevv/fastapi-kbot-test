@@ -32,7 +32,7 @@ async def search_user(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
     try:
-        telegram_id = int(message.text.strip())
+        telegram_id = int((message.text or "").strip())
     except ValueError:
         await message.answer("Iltimos, to'g'ri ID kiriting (faqat raqamlar):")
         return
@@ -80,7 +80,7 @@ async def set_new_score(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
     try:
-        new_score = int(message.text.strip())
+        new_score = int((message.text or "").strip())
     except ValueError:
         await message.answer("Iltimos, son kiriting:")
         return
@@ -102,7 +102,11 @@ async def set_score_reason(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
     data = await state.get_data()
-    reason = message.text.strip() if message.text.strip() != "-" else None
+    reason_text = (message.text or "").strip()
+    if not reason_text:
+        await message.answer("Sababni matn ko'rinishida yuboring yoki '-' yuboring.")
+        return
+    reason = reason_text if reason_text != "-" else None
     service = AdminService(session)
     caller = await service.find_user(message.from_user.id)
     user = await service.set_score(
@@ -140,7 +144,7 @@ async def set_referral_count(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
     try:
-        new_count = int(message.text.strip())
+        new_count = int((message.text or "").strip())
     except ValueError:
         await message.answer("Iltimos, son kiriting:")
         return
@@ -161,7 +165,11 @@ async def set_referral_reason(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
     data = await state.get_data()
-    reason = message.text.strip() if message.text.strip() != "-" else None
+    reason_text = (message.text or "").strip()
+    if not reason_text:
+        await message.answer("Sababni matn ko'rinishida yuboring yoki '-' yuboring.")
+        return
+    reason = reason_text if reason_text != "-" else None
     service = AdminService(session)
     caller = await service.find_user(message.from_user.id)
     user = await service.set_referral_count(

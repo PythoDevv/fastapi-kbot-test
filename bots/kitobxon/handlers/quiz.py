@@ -339,7 +339,6 @@ async def start_quiz(
             "Testni boshlash uchun quyidagi tugmani bosing:",
             reply_markup=inline.webapp_quiz_keyboard(webapp_url),
         )
-        await state.clear()
     elif result.quiz_type == QuizType.WEB:
         await message.answer(
             _format_question(result.first_question),
