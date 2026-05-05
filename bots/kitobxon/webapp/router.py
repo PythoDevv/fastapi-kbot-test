@@ -1,3 +1,4 @@
+from collections.abc import AsyncGenerator
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, Request
@@ -34,9 +35,15 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/webapp", tags=["webapp"])
 
 
-async def get_db():
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
-        yield session
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+        else:
+            await session.commit()
 
 
 def _q_out(payload) -> QuestionOut:
