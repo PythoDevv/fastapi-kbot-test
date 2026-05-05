@@ -42,11 +42,9 @@ class StartResult:
 
 @dataclass
 class AnswerResult:
-    is_correct: bool
     is_last: bool
     score: int
     total_questions: int
-    correct_answer: str
     next_question: QuestionPayload | None
 
 
@@ -74,6 +72,9 @@ class QuizService:
             raise UserNotRegisteredError()
         if user.test_solved:
             raise AlreadySolvedError()
+
+        await self.quiz.acquire_quiz_lock(user.id)
+
         if await self.quiz.has_active_session(user.id):
             raise QuizAlreadyStartedError()
 
@@ -83,7 +84,9 @@ class QuizService:
         if settings.finished:
             raise QuizFinishedError()
 
-        questions = await self.quiz.get_random_questions(settings.questions_per_test)
+        available_questions = await self.quiz.count_questions()
+        question_limit = min(settings.questions_per_test, available_questions)
+        questions = await self.quiz.get_random_questions(question_limit)
         if not questions:
             raise NoQuestionsError()
 
@@ -130,11 +133,7 @@ class QuizService:
         question_ids, _ = self.quiz.decode_session_questions(test_session.questions_json)
         if test_session.current_index >= len(question_ids):
             return None
-        questions = await self.quiz.get_questions_by_ids(question_ids)
-        question = next(
-            (q for q in questions if q.id == question_ids[test_session.current_index]),
-            None,
-        )
+        question = await self.quiz.get(question_ids[test_session.current_index])
         if question is None:
             return None
         return self._build_payload(
@@ -152,15 +151,32 @@ class QuizService:
         time_taken: int,
         is_timeout: bool = False,
     ) -> AnswerResult:
-        test_session = await self.quiz.get_session(session_id)
+        test_session = await self.quiz.get_session_for_update(session_id)
         if test_session is None:
             raise QuizNotActiveError("Session topilmadi")
         if test_session.is_completed:
             raise QuizFinishedError()
         if question_index != test_session.current_index:
+            if (
+                question_index < test_session.current_index
+                and await self.quiz.answer_exists(session_id, question_index)
+            ):
+                current_payload = await self.get_current_payload(session_id)
+                return AnswerResult(
+                    is_last=current_payload is None,
+                    score=test_session.score,
+                    total_questions=test_session.total_questions,
+                    next_question=current_payload,
+                )
             raise QuizNotActiveError("Noto'g'ri savol tartibi")
         if await self.quiz.answer_exists(session_id, question_index):
-            raise QuizNotActiveError("Bu savolga javob berilgan")
+            current_payload = await self.get_current_payload(session_id)
+            return AnswerResult(
+                is_last=current_payload is None,
+                score=test_session.score,
+                total_questions=test_session.total_questions,
+                next_question=current_payload,
+            )
 
         question_ids, _ = self.quiz.decode_session_questions(test_session.questions_json)
         if question_index >= len(question_ids):
@@ -196,14 +212,12 @@ class QuizService:
 
         if is_last:
             await self.quiz.complete_session(session_id)
-            await self._finalize_session(test_session.user_id, session_id)
             current_score = test_session.score + (1 if is_correct else 0)
+            await self._finalize_session(test_session.user_id, current_score)
             return AnswerResult(
-                is_correct=is_correct,
                 is_last=True,
                 score=current_score,
                 total_questions=test_session.total_questions,
-                correct_answer=question.correct_answer,
                 next_question=None,
             )
 
@@ -216,24 +230,20 @@ class QuizService:
             total=test_session.total_questions,
         )
         return AnswerResult(
-            is_correct=is_correct,
             is_last=False,
             score=test_session.score + (1 if is_correct else 0),
             total_questions=test_session.total_questions,
-            correct_answer=question.correct_answer,
             next_question=next_payload,
         )
 
-    async def _finalize_session(self, user_id: int, session_id: int) -> None:
-        test_session = await self.quiz.get_session(session_id)
-        assert test_session is not None
+    async def _finalize_session(self, user_id: int, final_score: int) -> None:
         user = await self.users.get(user_id)
         assert user is not None
         await self.users.update_fields(
             user.telegram_id,
             test_solved=True,
         )
-        await self.users.increment_score(user.id, test_session.score)
+        await self.users.increment_score(user.id, final_score)
 
     # ---------- Native poll helpers ----------
     async def register_poll(

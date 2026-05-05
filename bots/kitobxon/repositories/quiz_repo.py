@@ -17,6 +17,7 @@ from bots.kitobxon.repositories.base import BaseRepository
 
 class QuizRepository(BaseRepository[Question]):
     model = Question
+    _QUIZ_LOCK_NAMESPACE = 41001
 
     @staticmethod
     def encode_session_questions(
@@ -82,8 +83,22 @@ class QuizRepository(BaseRepository[Question]):
 
     # --- Questions ---
     async def get_random_questions(self, count: int) -> list[Question]:
-        stmt = select(Question).order_by(func.random()).limit(count)
-        return list((await self.session.execute(stmt)).scalars().all())
+        if count <= 0:
+            return []
+
+        question_ids = list(
+            (
+                await self.session.execute(
+                    select(Question.id).order_by(Question.id)
+                )
+            ).scalars().all()
+        )
+        if not question_ids:
+            return []
+
+        random.shuffle(question_ids)
+        selected_ids = question_ids[:count]
+        return await self.get_questions_by_ids(selected_ids)
 
     async def get_questions_by_ids(self, ids: list[int]) -> list[Question]:
         if not ids:
@@ -106,6 +121,11 @@ class QuizRepository(BaseRepository[Question]):
             .limit(1)
         )
         return (await self.session.execute(stmt)).scalar_one_or_none()
+
+    async def acquire_quiz_lock(self, user_id: int) -> None:
+        await self.session.execute(
+            select(func.pg_advisory_xact_lock(self._QUIZ_LOCK_NAMESPACE, user_id))
+        )
 
     async def has_active_session(self, user_id: int) -> bool:
         return (await self.get_active_session(user_id)) is not None
@@ -135,6 +155,15 @@ class QuizRepository(BaseRepository[Question]):
 
     async def get_session(self, session_id: int) -> TestSession | None:
         return await self.session.get(TestSession, session_id)
+
+    async def get_session_for_update(self, session_id: int) -> TestSession | None:
+        stmt = (
+            select(TestSession)
+            .where(TestSession.id == session_id)
+            .with_for_update()
+            .limit(1)
+        )
+        return (await self.session.execute(stmt)).scalar_one_or_none()
 
     async def advance_session(self, session_id: int, new_index: int) -> None:
         await self.session.execute(

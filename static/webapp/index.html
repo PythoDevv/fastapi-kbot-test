@@ -65,14 +65,6 @@
 
   /* Options */
   .options { display: flex; flex-direction: column; gap: 10px; }
-  .feedback {
-    min-height: 24px;
-    margin: 10px 2px 0;
-    font-size: 14px;
-    font-weight: 600;
-  }
-  .feedback.correct { color: #2e7d32; }
-  .feedback.wrong { color: #c62828; }
   .option {
     background: #fff;
     border: 1.5px solid #e0e0e0;
@@ -90,8 +82,6 @@
   }
   .option:active { background: #f5f5f5; }
   .option.selected { border-color: #2196f3; background: #e3f2fd; }
-  .option.correct  { border-color: #43a047; background: #e8f5e9; }
-  .option.wrong    { border-color: #e53935; background: #ffebee; }
   .option.disabled { pointer-events: none; opacity: 0.85; }
 
   .radio {
@@ -103,17 +93,12 @@
     transition: border-color 0.15s;
   }
   .option.selected .radio { border-color: #2196f3; }
-  .option.correct .radio  { border-color: #43a047; background: #43a047; }
-  .option.wrong .radio    { border-color: #e53935; background: #e53935; }
   .radio-dot {
     width: 10px; height: 10px;
     border-radius: 50%;
     background: #fff;
     display: none;
   }
-  .option.correct .radio-dot,
-  .option.wrong .radio-dot { display: block; }
-
   /* Next button */
   .btn-next {
     position: fixed;
@@ -213,8 +198,6 @@
   <div class="question-card" id="question-text"></div>
 
   <div class="options" id="options"></div>
-  <div class="feedback" id="feedback"></div>
-
   <button class="btn-next" id="btn-next" disabled onclick="onNext()">Keyingi Savol</button>
 </div>
 
@@ -297,9 +280,6 @@ function renderQuestion(q, total, timeLimitSeconds) {
   currentIndex = q.index;
   selectedOption = null;
   answering = false;
-  const feedbackEl = document.getElementById('feedback');
-  feedbackEl.textContent = '';
-  feedbackEl.className = 'feedback';
 
   document.getElementById('progress-text').textContent = (q.index + 1) + ' / ' + total;
   document.getElementById('progress-bar').style.width = ((q.index / total) * 100) + '%';
@@ -346,12 +326,11 @@ async function submitAnswer(answer) {
   if (answering) return;
   answering = true;
   clearInterval(timerInterval);
+  document.getElementById('btn-next').disabled = true;
+  document.getElementById('btn-next').classList.remove('active');
+  document.querySelectorAll('.option').forEach(el => el.classList.add('disabled'));
 
   const timeTakenMs = startedAt ? (Date.now() - startedAt) : (timeLimitSec * 1000);
-
-  // Highlight correct/wrong before moving on
-  const opts = document.querySelectorAll('.option');
-  let correctAnswer = null;
 
   try {
     const res = await api('/answer', {
@@ -361,26 +340,10 @@ async function submitAnswer(answer) {
       time_taken_ms: timeTakenMs,
     });
 
-    correctAnswer = res.correct_answer;
-
-    const feedbackEl = document.getElementById('feedback');
-    feedbackEl.textContent = res.feedback_text || '';
-    feedbackEl.className = 'feedback ' + (res.is_correct ? 'correct' : 'wrong');
-
-    // Show feedback colors briefly
-    opts.forEach(el => {
-      const text = el.querySelector('span').textContent;
-      el.classList.add('disabled');
-      if (text === correctAnswer) el.classList.add('correct');
-      else if (text === answer && !res.is_correct) el.classList.add('wrong');
-    });
-
-    await delay(answer ? 900 : 500);
-
     if (res.is_last) {
       showResult(res.score, res.total_questions);
     } else {
-      renderQuestion(res.next_question, totalQuestions, timeLimitSec);
+      renderQuestion(res.next_question, res.total_questions, timeLimitSec);
     }
   } catch (e) {
     if (e.detail === 'already_solved') {
@@ -400,10 +363,6 @@ function showResult(score, total) {
   document.getElementById('result-icon').textContent = score >= total * 0.6 ? '🏆' : '📝';
   // Notify Telegram
   tg.sendData(JSON.stringify({ score, total }));
-}
-
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function init() {

@@ -36,12 +36,6 @@ def _format_question(payload: QuestionPayload) -> str:
     )
 
 
-def _answer_feedback_text(is_correct: bool, correct_answer: str) -> str:
-    if is_correct:
-        return "✅ To'g'ri javob"
-    return f"❌ Noto'g'ri javob\nTo'g'ri javob: <b>{correct_answer}</b>"
-
-
 def _cancel_timeout(user_id: int) -> None:
     """Cancel pending timeout task for user"""
     task = _timeout_tasks.pop(user_id, None)
@@ -412,10 +406,7 @@ async def handle_web_answer(
         await cb.answer()
         return
 
-    await cb.answer("✅" if result.is_correct else "❌")
-    await cb.message.answer(
-        _answer_feedback_text(result.is_correct, result.correct_answer),
-    )
+    await cb.answer()
 
     if result.is_last:
         await state.clear()
@@ -494,11 +485,6 @@ async def handle_poll_answer(
             await bot.delete_message(poll_answer.user.id, mapping.message_id)
         except Exception as e:
             logger.warning(f"Failed to delete poll message {mapping.message_id}: {e}")
-
-        await bot.send_message(
-            poll_answer.user.id,
-            _answer_feedback_text(result.is_correct, result.correct_answer),
-        )
 
         if result.is_last:
             await bot.send_message(
