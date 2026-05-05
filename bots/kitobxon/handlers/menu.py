@@ -4,7 +4,7 @@ from aiogram import Bot, F, Router
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import reply
@@ -69,15 +69,25 @@ async def referral_link(message: Message, session: AsyncSession) -> None:
 
     final_text = "\n\n".join(text_parts)
 
+    # Build button when link is shown
+    reply_markup = None
+    if should_show_link:
+        reply_markup = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="🔗 Referal havola", url=link)]
+            ]
+        )
+
     # Send with or without photo based on content.image_id
     if content and content.image_id:
         await message.answer_photo(
             photo=content.image_id,
             caption=final_text,
             parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup,
         )
     else:
-        await message.answer(final_text, parse_mode=ParseMode.HTML)
+        await message.answer(final_text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
 
 
 @router.message(F.text == "📝 Tanlov shartlari")

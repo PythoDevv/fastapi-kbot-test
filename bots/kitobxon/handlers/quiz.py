@@ -286,7 +286,14 @@ async def start_quiz(
             question_sent_at=datetime.utcnow().isoformat(),
         )
 
-        if settings.quiz_type == QuizType.WEB:
+        if settings.quiz_type == QuizType.WEBAPP:
+            from core.config import settings as app_settings
+            webapp_url = f"{app_settings.BASE_WEBHOOK_URL.rstrip('/')}/webapp/"
+            await message.answer(
+                "Testni davom ettirish uchun quyidagi tugmani bosing:",
+                reply_markup=inline.webapp_quiz_keyboard(webapp_url),
+            )
+        elif settings.quiz_type == QuizType.WEB:
             await message.answer(
                 _format_question(payload),
                 reply_markup=inline.quiz_keyboard(payload),
@@ -325,7 +332,15 @@ async def start_quiz(
         question_sent_at=datetime.utcnow().isoformat(),
     )
 
-    if result.quiz_type == QuizType.WEB:
+    if result.quiz_type == QuizType.WEBAPP:
+        from core.config import settings as app_settings
+        webapp_url = f"{app_settings.BASE_WEBHOOK_URL.rstrip('/')}/webapp/"
+        await message.answer(
+            "Testni boshlash uchun quyidagi tugmani bosing:",
+            reply_markup=inline.webapp_quiz_keyboard(webapp_url),
+        )
+        await state.clear()
+    elif result.quiz_type == QuizType.WEB:
         await message.answer(
             _format_question(result.first_question),
             reply_markup=inline.quiz_keyboard(result.first_question),

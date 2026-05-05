@@ -38,7 +38,12 @@
       "Read(//home/ilyos/bots/kitobxon/handlers/**)",
       "Bash(pkill -f \"python.*main.py\")",
       "Bash(awk '{print $2}')",
-      "Bash(xargs -r kill -9 echo \"Done\")"
+      "Bash(xargs -r kill -9 echo \"Done\")",
+      "Bash(pip show *)",
+      "Bash(/home/ilyos/bots/kbot_and_test_solve/venv/bin/pip show *)",
+      "Bash(/home/ilyos/bots/kbot_and_test_solve/venv/bin/pip list *)",
+      "Bash(/home/ilyos/bots/kbot_and_test_solve/venv/bin/pip install *)",
+      "Bash(venv/bin/python -c ' *)"
     ],
     "additionalDirectories": [
       "/tmp"

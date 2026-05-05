@@ -1,4 +1,4 @@
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from bots.kitobxon.models import Channel, Question, ZayafkaChannel
 from bots.kitobxon.services.quiz_service import QuestionPayload
@@ -21,6 +21,14 @@ def subscription_keyboard(
         [InlineKeyboardButton(text="✅ Tekshirish", callback_data="check_subscription")]
     )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def webapp_quiz_keyboard(webapp_url: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🧑‍💻 Testni boshlash", web_app=WebAppInfo(url=webapp_url))]
+        ]
+    )
 
 
 def quiz_keyboard(payload: QuestionPayload) -> InlineKeyboardMarkup:

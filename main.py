@@ -4,6 +4,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from bots.kitobxon.handlers.router import build_router as build_kitobxon_router
+from bots.kitobxon.webapp.router import router as webapp_router
 from core.admin_init import initialize_admins
 from core.config import settings
 from core.database import AsyncSessionLocal, dispose_engine
@@ -65,6 +66,8 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
 )
+
+app.include_router(webapp_router)
 
 
 @app.get("/health", tags=["system"])

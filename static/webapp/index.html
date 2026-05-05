@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Test</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f0f2f5;
+    min-height: 100vh;
+    padding: 0;
+  }
+  #app { max-width: 480px; margin: 0 auto; padding: 12px 12px 80px; }
+
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 4px;
+    margin-bottom: 8px;
+  }
+  .progress-text { font-size: 15px; color: #444; font-weight: 500; }
+  .timer {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #333;
+  }
+  .timer.warning { color: #e53935; }
+  .timer svg { width: 16px; height: 16px; }
+
+  /* Progress bar */
+  .progress-bar-wrap {
+    height: 4px;
+    background: #ddd;
+    border-radius: 4px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: #2196f3;
+    border-radius: 4px;
+    transition: width 0.3s;
+  }
+
+  /* Question card */
+  .question-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 20px 18px;
+    margin-bottom: 14px;
+    font-size: 16px;
+    line-height: 1.55;
+    color: #1a1a1a;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    min-height: 120px;
+  }
+
+  /* Options */
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .option {
+    background: #fff;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 15px;
+    color: #222;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: border-color 0.15s, background 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  .option:active { background: #f5f5f5; }
+  .option.selected { border-color: #2196f3; background: #e3f2fd; }
+  .option.correct  { border-color: #43a047; background: #e8f5e9; }
+  .option.wrong    { border-color: #e53935; background: #ffebee; }
+  .option.disabled { pointer-events: none; opacity: 0.85; }
+
+  .radio {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    border: 2px solid #bbb;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s;
+  }
+  .option.selected .radio { border-color: #2196f3; }
+  .option.correct .radio  { border-color: #43a047; background: #43a047; }
+  .option.wrong .radio    { border-color: #e53935; background: #e53935; }
+  .radio-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #fff;
+    display: none;
+  }
+  .option.correct .radio-dot,
+  .option.wrong .radio-dot { display: block; }
+
+  /* Next button */
+  .btn-next {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 24px);
+    max-width: 456px;
+    background: #bbb;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn-next.active { background: #2196f3; }
+  .btn-next:disabled { opacity: 0.7; cursor: default; }
+
+  /* Result screen */
+  #result-screen {
+    display: none;
+    text-align: center;
+    padding: 40px 20px;
+  }
+  .result-icon { font-size: 60px; margin-bottom: 16px; }
+  .result-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .result-score { font-size: 18px; color: #555; margin-bottom: 24px; }
+  .btn-close {
+    background: #2196f3;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 32px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Loading */
+  #loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    gap: 16px;
+    color: #666;
+    font-size: 15px;
+  }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid #ddd;
+    border-top-color: #2196f3;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #error-screen {
+    display: none;
+    text-align: center;
+    padding: 40px 20px;
+    color: #e53935;
+    font-size: 16px;
+  }
+</style>
+</head>
+<body>
+<div id="loading">
+  <div class="spinner"></div>
+  <span>Yuklanmoqda...</span>
+</div>
+
+<div id="error-screen">
+  <div style="font-size:48px;margin-bottom:16px">⚠️</div>
+  <div id="error-msg">Xatolik yuz berdi</div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="header">
+    <span class="progress-text" id="progress-text">1 / 1</span>
+    <div class="timer" id="timer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+      <span id="timer-val">00:00</span>
+    </div>
+  </div>
+
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-fill" id="progress-bar" style="width:0%"></div>
+  </div>
+
+  <div class="question-card" id="question-text"></div>
+
+  <div class="options" id="options"></div>
+
+  <button class="btn-next" id="btn-next" disabled onclick="onNext()">Keyingi Savol</button>
+</div>
+
+<div id="result-screen">
+  <div class="result-icon" id="result-icon">🏆</div>
+  <div class="result-title">Test yakunlandi!</div>
+  <div class="result-score" id="result-score"></div>
+  <button class="btn-close" onclick="Telegram.WebApp.close()">Yopish</button>
+</div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+const BASE = '';  // same origin
+let token = null;
+let sessionId = null;
+let currentIndex = 0;
+let totalQuestions = 0;
+let timeLimitSec = 40;
+let timerInterval = null;
+let startedAt = null;
+let selectedOption = null;
+let answering = false;
+
+async function api(path, body) {
+  const res = await fetch(BASE + '/webapp' + path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw { status: res.status, detail: err.detail || 'error' };
+  }
+  return res.json();
+}
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('result-screen').style.display = 'none';
+  document.getElementById('error-screen').style.display = 'block';
+  document.getElementById('error-msg').textContent = msg;
+}
+
+function startTimer() {
+  clearInterval(timerInterval);
+  startedAt = Date.now();
+  let remaining = timeLimitSec;
+  updateTimerDisplay(remaining);
+
+  timerInterval = setInterval(() => {
+    remaining--;
+    updateTimerDisplay(remaining);
+    if (remaining <= 0) {
+      clearInterval(timerInterval);
+      submitAnswer(null); // timeout
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay(sec) {
+  const el = document.getElementById('timer-val');
+  const timerEl = document.getElementById('timer');
+  const m = Math.floor(sec / 60).toString().padStart(2, '0');
+  const s = (sec % 60).toString().padStart(2, '0');
+  el.textContent = m + ':' + s;
+  if (sec <= 10) timerEl.classList.add('warning');
+  else timerEl.classList.remove('warning');
+}
+
+function renderQuestion(q, total, timeLimitSeconds) {
+  totalQuestions = total;
+  timeLimitSec = timeLimitSeconds;
+  currentIndex = q.index;
+  selectedOption = null;
+  answering = false;
+
+  document.getElementById('progress-text').textContent = (q.index + 1) + ' / ' + total;
+  document.getElementById('progress-bar').style.width = ((q.index / total) * 100) + '%';
+  document.getElementById('question-text').textContent = q.text;
+
+  const optContainer = document.getElementById('options');
+  optContainer.innerHTML = '';
+  q.options.forEach((opt, i) => {
+    const div = document.createElement('div');
+    div.className = 'option';
+    div.innerHTML = `<div class="radio"><div class="radio-dot"></div></div><span>${opt}</span>`;
+    div.addEventListener('click', () => selectOption(opt, div));
+    optContainer.appendChild(div);
+  });
+
+  const btn = document.getElementById('btn-next');
+  btn.disabled = true;
+  btn.classList.remove('active');
+
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('result-screen').style.display = 'none';
+
+  startTimer();
+}
+
+function selectOption(opt, el) {
+  if (answering) return;
+  selectedOption = opt;
+  document.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  const btn = document.getElementById('btn-next');
+  btn.disabled = false;
+  btn.classList.add('active');
+}
+
+async function onNext() {
+  if (!selectedOption || answering) return;
+  clearInterval(timerInterval);
+  await submitAnswer(selectedOption);
+}
+
+async function submitAnswer(answer) {
+  if (answering) return;
+  answering = true;
+  clearInterval(timerInterval);
+
+  const timeTakenMs = startedAt ? (Date.now() - startedAt) : (timeLimitSec * 1000);
+
+  // Highlight correct/wrong before moving on
+  const opts = document.querySelectorAll('.option');
+  let correctAnswer = null;
+
+  try {
+    const res = await api('/answer', {
+      session_id: sessionId,
+      question_index: currentIndex,
+      selected_option: answer,
+      time_taken_ms: timeTakenMs,
+    });
+
+    correctAnswer = res.correct_answer;
+
+    // Show feedback colors briefly
+    opts.forEach(el => {
+      const text = el.querySelector('span').textContent;
+      el.classList.add('disabled');
+      if (text === correctAnswer) el.classList.add('correct');
+      else if (text === answer && !res.is_correct) el.classList.add('wrong');
+    });
+
+    await delay(answer ? 600 : 200);
+
+    if (res.is_last) {
+      showResult(res.score, res.total_questions);
+    } else {
+      renderQuestion(res.next_question, totalQuestions, timeLimitSec);
+    }
+  } catch (e) {
+    if (e.detail === 'already_solved') {
+      showError('Siz testni allaqachon yakunladingiz.');
+    } else {
+      showError('Xatolik: ' + (e.detail || 'noma\'lum'));
+    }
+  }
+}
+
+function showResult(score, total) {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loading').style.display = 'none';
+  const rs = document.getElementById('result-screen');
+  rs.style.display = 'block';
+  document.getElementById('result-score').textContent = 'Natija: ' + score + ' / ' + total;
+  document.getElementById('result-icon').textContent = score >= total * 0.6 ? '🏆' : '📝';
+  // Notify Telegram
+  tg.sendData(JSON.stringify({ score, total }));
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function init() {
+  try {
+    const initData = tg.initData;
+    if (!initData) {
+      // Dev mode: allow without initData for testing
+      showError('Telegram orqali oching');
+      return;
+    }
+
+    const authRes = await api('/auth', { init_data: initData });
+    token = authRes.token;
+
+    const startRes = await api('/start', {});
+    sessionId = startRes.session_id;
+
+    renderQuestion(startRes.question, startRes.total, startRes.time_limit_seconds);
+  } catch (e) {
+    const detail = e.detail || '';
+    if (detail === 'waiting') showError("Test hali boshlanmagan. Kuting.");
+    else if (detail === 'finished') showError("Test yakunlandi.");
+    else if (detail === 'already_solved') showError("Siz testni allaqachon yakunladingiz.");
+    else showError('Xatolik: ' + detail);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
