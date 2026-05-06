@@ -93,3 +93,11 @@ class UserRepository(BaseRepository[User]):
         await self.session.execute(
             delete(User).where(User.telegram_id == telegram_id)
         )
+
+    async def delete_all(self) -> None:
+        """Delete all users"""
+        await self.session.execute(delete(User))
+
+    async def update_all(self, **values) -> None:
+        """Update all users with given values"""
+        await self.session.execute(update(User).values(**values))

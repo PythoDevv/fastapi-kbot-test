@@ -115,6 +115,14 @@ class AdminService:
         """Delete a user by telegram_id"""
         await self.users.delete_by_telegram_id(target_telegram_id)
 
+    async def delete_all_users(self) -> None:
+        """Delete all users from database"""
+        await self.users.delete_all()
+
+    async def clear_all_solved(self) -> None:
+        """Clear test_solved status for all users"""
+        await self.users.update_all(test_solved=False)
+
     async def import_users(self, users_data: list[dict]) -> tuple[int, int, int]:
         """Import users from excel data. Returns (updated, created, skipped)"""
         updated = 0

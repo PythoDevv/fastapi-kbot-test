@@ -94,6 +94,8 @@ async def _finish_registration(
             ),
         )
         return
+
+    await auth.award_referral_bonus_if_eligible(message.from_user.id)
     await message.answer("Tabriklaymiz! Ro'yxatdan o'tdingiz.", reply_markup=reply.main_menu())
 
 

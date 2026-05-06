@@ -2,8 +2,7 @@ from aiogram import Bot, Router
 from aiogram.types import ChatJoinRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bots.kitobxon.repositories import UserRepository
-from bots.kitobxon.services import SubsService
+from bots.kitobxon.services import AuthService, SubsService
 from core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -14,15 +13,17 @@ router = Router(name="subs")
 async def handle_join_request(
     request: ChatJoinRequest, bot: Bot, session: AsyncSession
 ) -> None:
-    user_repo = UserRepository(session)
-    user = await user_repo.get_by_telegram_id(request.from_user.id)
-    if not user:
-        return
+    auth = AuthService(session)
+    result = await auth.touch_user(
+        telegram_id=request.from_user.id,
+        username=request.from_user.username,
+        first_name=request.from_user.first_name,
+    )
 
     subs = SubsService(session)
-    # Record that user sent join request to this Zayafka channel
-    # This marks it as "requested" so it won't show in subscription checks
-    await subs.approve_zayafka(user.id, request.chat.id)
+    # Record that user sent join request so closed-channel checks
+    # do not ask for the same request again.
+    await subs.mark_zayafka_requested(result.user.id, request.chat.id)
 
     # Note: Auto-approval is removed. Admin will manually approve join requests
     # in the Telegram channel. This ensures better control over who joins.

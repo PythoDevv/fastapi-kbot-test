@@ -34,10 +34,10 @@ class SubsService:
             if not await self._is_member(bot, ch.channel_id, telegram_id):
                 missing.append(ch)
 
-        approved = await self.zayafka.get_user_approved_ids(user_db_id)
+        requested_or_approved = await self.zayafka.get_user_recorded_ids(user_db_id)
         missing_zayafka: list[ZayafkaChannel] = []
         for zch in await self.zayafka.list_ordered():
-            if zch.id not in approved:
+            if zch.id not in requested_or_approved:
                 if not await self._is_member(bot, zch.channel_id, telegram_id):
                     missing_zayafka.append(zch)
 
@@ -64,7 +64,7 @@ class SubsService:
             )
             return False
 
-    async def approve_zayafka(
+    async def mark_zayafka_requested(
         self, user_db_id: int, zayafka_channel_telegram_id: int
     ) -> None:
         zlist = await self.zayafka.list_ordered()
@@ -73,4 +73,4 @@ class SubsService:
             None,
         )
         if match:
-            await self.zayafka.mark_approved(user_db_id, match.id)
+            await self.zayafka.mark_requested(user_db_id, match.id)

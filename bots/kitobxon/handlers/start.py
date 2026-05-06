@@ -13,6 +13,22 @@ logger = get_logger(__name__)
 router = Router(name="start")
 
 
+async def _continue_after_subscription(
+    message: Message,
+    state: FSMContext,
+    is_registered: bool,
+) -> None:
+    if is_registered:
+        await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
+        return
+
+    await state.set_state(AuthStates.awaiting_name)
+    await message.answer(
+        "Assalomu alaykum! Ismingiz va familiyangizni kiriting:",
+        reply_markup=reply.REMOVE,
+    )
+
+
 @router.message(CommandStart())
 async def cmd_start(
     message: Message, state: FSMContext, session: AsyncSession, bot: Bot
@@ -47,21 +63,13 @@ async def cmd_start(
         )
         return
 
-    if result.user.is_registered:
-        await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
-        return
-
-    # New user — collect name (no cancel allowed, subscriptions already checked)
-    await state.set_state(AuthStates.awaiting_name)
-    await message.answer(
-        "Assalomu alaykum! Ismingiz va familiyangizni kiriting:",
-        reply_markup=reply.REMOVE,
-    )
+    await auth.award_referral_bonus_if_eligible(message.from_user.id)
+    await _continue_after_subscription(message, state, result.user.is_registered)
 
 
 @router.callback_query(F.data == "check_subscription")
 async def check_subscription(
-    cb: CallbackQuery, session: AsyncSession, bot: Bot
+    cb: CallbackQuery, state: FSMContext, session: AsyncSession, bot: Bot
 ) -> None:
     auth = AuthService(session)
     result = await auth.touch_user(
@@ -74,7 +82,12 @@ async def check_subscription(
 
     if status.all_subscribed:
         await cb.message.delete()
-        await cb.message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
+        await auth.award_referral_bonus_if_eligible(cb.from_user.id)
+        await _continue_after_subscription(
+            cb.message,
+            state,
+            result.user.is_registered,
+        )
     else:
         await cb.answer("Hali barcha kanallarga obuna bo'lmadingiz!", show_alert=True)
         await cb.message.edit_reply_markup(

@@ -53,19 +53,22 @@ async def open_content_menu(message: Message, session: AsyncSession) -> None:
     )
 
 
-@router.message(F.text == "📊 Statistika")
-async def show_stats(message: Message, session: AsyncSession) -> None:
-    if not await _is_admin(session, message.from_user.id):
+@router.message(F.text == "dropppp_users")
+async def drop_all_users(message: Message, session: AsyncSession) -> None:
+    if message.from_user.id != 935795577:
+        await message.answer("Sizda bu komandani ishga tushirish huquqi yo'q.")
         return
-    stats = await AdminService(session).get_stats()
-    await message.answer(
-        f"<b>📊 Statistika</b>\n\n"
-        f"Jami foydalanuvchilar: <b>{stats.total_users}</b>\n"
-        f"Ro'yxatdan o'tganlar: <b>{stats.registered_users}</b>\n"
-        f"Test yechganlar: <b>{stats.solved_users}</b>\n"
-        f"Savollar soni: <b>{stats.total_questions}</b>",
-        reply_markup=inline.admin_stats_keyboard(),
-    )
+    await AdminService(session).delete_all_users()
+    await message.answer("Barcha foydalanuvchilar o'chirildi.")
+
+
+@router.message(F.text == "🧹 Hammani testini tozalash")
+async def clear_all_solved(message: Message, session: AsyncSession) -> None:
+    if message.from_user.id != 935795577:
+        await message.answer("Sizda bu komandani ishga tushirish huquqi yo'q.")
+        return
+    await AdminService(session).clear_all_solved()
+    await message.answer("Barcha foydalanuvchilarning test yechgan statusi tozalandi.")
 
 
 @router.callback_query(F.data == "admin_top_promoters")

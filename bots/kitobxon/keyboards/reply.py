@@ -55,7 +55,10 @@ def admin_panel() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="Namuna olish 📄"),
             ],
             [
+                KeyboardButton(text="Savollar ro'yxati"),
                 KeyboardButton(text="Savolni export qilish 📤"),
+            ],
+            [
                 KeyboardButton(text="Userlarni import 📤"),
             ],
             [
@@ -69,6 +72,9 @@ def admin_panel() -> ReplyKeyboardMarkup:
             [
                 KeyboardButton(text="🧹 Mening testimni tozalash"),
                 KeyboardButton(text="🧹 Foydalanuvchi testini tozalash"),
+            ],
+            [
+                KeyboardButton(text="🧹 Hammani testini tozalash"),
             ],
         ],
         resize_keyboard=True,

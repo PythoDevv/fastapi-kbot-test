@@ -36,6 +36,23 @@ def _format_question(payload: QuestionPayload) -> str:
     )
 
 
+def _finish_text(score: int, total_questions: int) -> str:
+    return (
+        "Testni yechib bo'ldingiz!\n\n"
+        f"To'g'ri javoblar soni: <b>{score}/{total_questions}</b>"
+    )
+
+
+async def _send_finish_and_menu(
+    message: Message,
+    *,
+    score: int,
+    total_questions: int,
+) -> None:
+    await message.answer(_finish_text(score, total_questions))
+    await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
+
+
 def _cancel_timeout(user_id: int) -> None:
     """Cancel pending timeout task for user"""
     task = _timeout_tasks.pop(user_id, None)
@@ -71,11 +88,8 @@ async def _timeout_task(
             return
 
         if result.is_last:
-            await bot.send_message(
-                chat_id,
-                f"Test yakunlandi!\n\nNatija: <b>{result.score}/{result.total_questions}</b>",
-                reply_markup=reply.main_menu(),
-            )
+            await bot.send_message(chat_id, _finish_text(result.score, result.total_questions))
+            await bot.send_message(chat_id, "Asosiy menyu:", reply_markup=reply.main_menu())
             await state.clear()
             return
 
@@ -143,11 +157,8 @@ async def _timeout_task_poll(
             pass
 
         if result.is_last:
-            await bot.send_message(
-                chat_id,
-                f"Test yakunlandi!\n\nNatija: <b>{result.score}/{result.total_questions}</b>",
-                reply_markup=reply.main_menu(),
-            )
+            await bot.send_message(chat_id, _finish_text(result.score, result.total_questions))
+            await bot.send_message(chat_id, "Asosiy menyu:", reply_markup=reply.main_menu())
             return
 
         # Send next poll
@@ -230,20 +241,6 @@ async def start_quiz(
             ),
         )
         return
-
-    # Award referral bonus if user was referred and hasn't received bonus yet
-    if (
-        user.referred_by
-        and not user.referral_bonus_awarded
-    ):
-        referrer = await user_repo.get_by_telegram_id(user.referred_by)
-        if referrer:
-            # Award 1 point to referrer
-            await user_repo.increment_score(referrer.id, 1)
-            # Mark that bonus was awarded
-            await user_repo.update_fields(
-                message.from_user.id, referral_bonus_awarded=True
-            )
 
     service = QuizService(session)
     result = None
@@ -411,9 +408,10 @@ async def handle_web_answer(
     if result.is_last:
         await state.clear()
         await cb.message.edit_reply_markup(reply_markup=None)
-        await cb.message.answer(
-            f"Test yakunlandi!\n\nNatija: <b>{result.score}/{result.total_questions}</b>",
-            reply_markup=reply.main_menu(),
+        await _send_finish_and_menu(
+            cb.message,
+            score=result.score,
+            total_questions=result.total_questions,
         )
         return
 
@@ -489,7 +487,11 @@ async def handle_poll_answer(
         if result.is_last:
             await bot.send_message(
                 poll_answer.user.id,
-                f"Test yakunlandi!\n\nNatija: <b>{result.score}/{result.total_questions}</b>",
+                _finish_text(result.score, result.total_questions),
+            )
+            await bot.send_message(
+                poll_answer.user.id,
+                "Asosiy menyu:",
                 reply_markup=reply.main_menu(),
             )
             return
@@ -504,7 +506,11 @@ async def handle_poll_answer(
             logger.error(f"Next question is None for session {mapping.session_id}, index {mapping.question_index}")
             await bot.send_message(
                 poll_answer.user.id,
-                f"Test yakunlandi!\n\nNatija: <b>{result.score}/{result.total_questions}</b>",
+                _finish_text(result.score, result.total_questions),
+            )
+            await bot.send_message(
+                poll_answer.user.id,
+                "Asosiy menyu:",
                 reply_markup=reply.main_menu(),
             )
             return

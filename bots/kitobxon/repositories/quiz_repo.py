@@ -18,6 +18,7 @@ from bots.kitobxon.repositories.base import BaseRepository
 class QuizRepository(BaseRepository[Question]):
     model = Question
     _QUIZ_LOCK_NAMESPACE = 41001
+    _system_random = random.SystemRandom()
 
     @staticmethod
     def encode_session_questions(
@@ -96,8 +97,10 @@ class QuizRepository(BaseRepository[Question]):
         if not question_ids:
             return []
 
-        random.shuffle(question_ids)
-        selected_ids = question_ids[:count]
+        selected_ids = self._system_random.sample(
+            question_ids,
+            k=min(count, len(question_ids)),
+        )
         return await self.get_questions_by_ids(selected_ids)
 
     async def get_questions_by_ids(self, ids: list[int]) -> list[Question]:

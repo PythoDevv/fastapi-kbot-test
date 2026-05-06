@@ -36,28 +36,25 @@ class ZayafkaRepository(BaseRepository[ZayafkaChannel]):
         )
         return list((await self.session.execute(stmt)).scalars().all())
 
-    async def get_user_approved_ids(self, user_id: int) -> set[int]:
+    async def get_user_recorded_ids(self, user_id: int) -> set[int]:
         stmt = select(UserZayafkaChannel.zayafka_channel_id).where(
             UserZayafkaChannel.user_id == user_id,
-            UserZayafkaChannel.approved.is_(True),
         )
         rows = (await self.session.execute(stmt)).scalars().all()
         return set(rows)
 
-    async def mark_approved(self, user_id: int, zayafka_channel_id: int) -> None:
+    async def mark_requested(self, user_id: int, zayafka_channel_id: int) -> None:
         stmt = select(UserZayafkaChannel).where(
             UserZayafkaChannel.user_id == user_id,
             UserZayafkaChannel.zayafka_channel_id == zayafka_channel_id,
         )
         existing = (await self.session.execute(stmt)).scalar_one_or_none()
-        if existing:
-            existing.approved = True
-        else:
+        if not existing:
             self.session.add(
                 UserZayafkaChannel(
                     user_id=user_id,
                     zayafka_channel_id=zayafka_channel_id,
-                    approved=True,
+                    approved=False,
                 )
             )
         await self.session.flush()
