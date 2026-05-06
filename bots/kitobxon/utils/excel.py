@@ -13,9 +13,16 @@ def export_users_to_excel(users: list) -> io.BytesIO:
     ws.title = "Foydalanuvchilar"
 
     headers = [
-        "№", "Telegram ID", "FIO", "Username",
-        "Telefon", "Ball", "Referallar",
-        "Test yechganmi", "Ro'yxatdan o'tgan sana",
+        "ID",
+        "FIO",
+        "Username",
+        "Telefon",
+        "Referallar",
+        "Ball",
+        "Javob",
+        "Kim taklif qildi (ID)",
+        "Telegram ID raqami",
+        "qo'shilgan vaqti",
     ]
     header_font = Font(bold=True, color="FFFFFF")
     header_fill = PatternFill(fill_type="solid", fgColor="2E4057")
@@ -29,21 +36,26 @@ def export_users_to_excel(users: list) -> io.BytesIO:
         cell.alignment = header_align
 
     for row_idx, user in enumerate(users, 2):
-        ws.cell(row=row_idx, column=1, value=row_idx - 1)
-        ws.cell(row=row_idx, column=2, value=user.telegram_id)
-        ws.cell(row=row_idx, column=3, value=user.fio or "")
-        ws.cell(row=row_idx, column=4, value=f"@{user.username}" if user.username else "")
-        ws.cell(row=row_idx, column=5, value=user.mobile_number or "")
+        ws.cell(row=row_idx, column=1, value=user.telegram_id)
+        ws.cell(row=row_idx, column=2, value=user.fio or "")
+        ws.cell(row=row_idx, column=3, value=f"@{user.username}" if user.username else "")
+        ws.cell(row=row_idx, column=4, value=user.mobile_number or "")
+        ws.cell(row=row_idx, column=5, value=user.referrals_count)
         ws.cell(row=row_idx, column=6, value=user.score)
-        ws.cell(row=row_idx, column=7, value=user.referrals_count)
-        ws.cell(row=row_idx, column=8, value="Ha" if user.test_solved else "Yo'q")
+        ws.cell(row=row_idx, column=7, value=1 if user.test_solved else 0)
+        ws.cell(row=row_idx, column=8, value=user.referred_by or "")
         ws.cell(
             row=row_idx,
             column=9,
-            value=user.created_at.strftime("%Y-%m-%d %H:%M") if user.created_at else "",
+            value=user.telegram_id,
+        )
+        ws.cell(
+            row=row_idx,
+            column=10,
+            value=user.created_at.strftime("%Y-%m-%d %H:%M:%S") if user.created_at else "",
         )
 
-    col_widths = [5, 14, 30, 20, 16, 8, 10, 12, 18]
+    col_widths = [16, 30, 24, 18, 12, 8, 8, 18, 18, 20]
     for col_idx, width in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(col_idx)].width = width
 

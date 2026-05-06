@@ -1,6 +1,7 @@
 import asyncio
 
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramAPIError, TelegramForbiddenError
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -164,6 +165,7 @@ async def run_referral_score_repair(
     await callback.answer("Aylantirish ishga tushdi.")
 
     sent_count = 0
+    skipped_count = 0
     for index, item in enumerate(result.updated_users, 1):
         try:
             await bot.send_message(
@@ -173,9 +175,23 @@ async def run_referral_score_repair(
                 f"Referrallar hisobga olindi: <b>{min(item.referral_count, REFERRAL_REPAIR_CAP)}</b>",
             )
             sent_count += 1
-        except Exception:
+        except TelegramForbiddenError as exc:
+            skipped_count += 1
+            logger.warning(
+                "Skipped referral repair notification user=%s: %s",
+                item.telegram_id,
+                exc,
+            )
+        except TelegramAPIError:
+            skipped_count += 1
             logger.exception(
-                "Failed to send referral repair notification to user=%s",
+                "Telegram API error while sending referral repair notification user=%s",
+                item.telegram_id,
+            )
+        except Exception:
+            skipped_count += 1
+            logger.exception(
+                "Unexpected error while sending referral repair notification user=%s",
                 item.telegram_id,
             )
         if index % 20 == 0:
@@ -185,7 +201,8 @@ async def run_referral_score_repair(
         "Referral ball aylantirish yakunlandi.\n\n"
         f"Yangilangan userlar: <b>{result.affected_count}</b>\n"
         f"Jami qo'shilgan ball: <b>{result.total_added}</b>\n"
-        f"Yuborilgan xabarlar: <b>{sent_count}</b>",
+        f"Yuborilgan xabarlar: <b>{sent_count}</b>\n"
+        f"O'tkazib yuborilganlar: <b>{skipped_count}</b>",
         reply_markup=reply.admin_panel(),
     )
 

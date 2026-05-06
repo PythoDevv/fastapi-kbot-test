@@ -239,6 +239,9 @@ class QuizService:
         if is_correct:
             await self.quiz.add_score(session_id, 1)
 
+        await self.quiz.refresh_session(test_session)
+        current_score = test_session.score
+
         total_time_seconds = await self.quiz.sum_answer_time(session_id)
 
         next_index = question_index + 1
@@ -246,7 +249,6 @@ class QuizService:
 
         if is_last:
             await self.quiz.complete_session(session_id)
-            current_score = test_session.score + (1 if is_correct else 0)
             await self._finalize_session(test_session.user_id, current_score)
             return AnswerResult(
                 is_last=True,
@@ -266,7 +268,7 @@ class QuizService:
         )
         return AnswerResult(
             is_last=False,
-            score=test_session.score + (1 if is_correct else 0),
+            score=current_score,
             total_questions=test_session.total_questions,
             next_question=next_payload,
             total_time_seconds=total_time_seconds,

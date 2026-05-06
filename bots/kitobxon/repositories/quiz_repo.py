@@ -177,6 +177,10 @@ class QuizRepository(BaseRepository[Question]):
     async def get_session(self, session_id: int) -> TestSession | None:
         return await self.session.get(TestSession, session_id)
 
+    async def refresh_session(self, test_session: TestSession) -> TestSession:
+        await self.session.refresh(test_session)
+        return test_session
+
     async def get_session_for_update(self, session_id: int) -> TestSession | None:
         stmt = (
             select(TestSession)
