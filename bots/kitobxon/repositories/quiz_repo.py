@@ -299,6 +299,36 @@ class QuizRepository(BaseRepository[Question]):
         rows = (await self.session.execute(stmt)).mappings().all()
         return [dict(row) for row in rows]
 
+    async def get_top_latest_completed_sessions(self, limit: int = 30) -> list[dict]:
+        latest_sessions = (
+            select(
+                TestSession.user_id.label("user_id"),
+                func.max(TestSession.id).label("session_id"),
+            )
+            .where(TestSession.is_completed.is_(True))
+            .group_by(TestSession.user_id)
+            .subquery()
+        )
+
+        stmt = (
+            select(
+                User.telegram_id.label("telegram_id"),
+                User.fio.label("fio"),
+                User.username.label("username"),
+                TestSession.id.label("session_id"),
+                TestSession.score.label("score"),
+                TestSession.total_questions.label("total_questions"),
+                TestSession.completed_at.label("completed_at"),
+            )
+            .join(latest_sessions, latest_sessions.c.session_id == TestSession.id)
+            .join(User, User.id == TestSession.user_id)
+            .order_by(TestSession.score.desc(), TestSession.completed_at.desc(), TestSession.id.desc())
+            .limit(limit)
+        )
+
+        rows = (await self.session.execute(stmt)).mappings().all()
+        return [dict(row) for row in rows]
+
     async def get_session_answers(self, session_id: int) -> list[TestAnswer]:
         stmt = (
             select(TestAnswer)

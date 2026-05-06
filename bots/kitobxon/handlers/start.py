@@ -1,4 +1,5 @@
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -111,10 +112,13 @@ async def check_subscription(
             result.user.is_registered,
         )
     else:
-        await cb.answer()
-        await cb.message.edit_text(
-            _subscription_prompt_text(True),
-            reply_markup=inline.subscription_keyboard(
-                status.missing_channels, status.missing_zayafka
-            ),
+        text = _subscription_prompt_text(True)
+        markup = inline.subscription_keyboard(
+            status.missing_channels, status.missing_zayafka
         )
+        try:
+            await cb.message.edit_text(text, reply_markup=markup)
+        except TelegramBadRequest as exc:
+            if "message is not modified" not in str(exc).lower():
+                raise
+        await cb.answer("Hali barcha kanallarga obuna bo'lmadingiz.")

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,8 +10,16 @@ from bots.kitobxon.repositories import QuizRepository, UserRepository
 @dataclass
 class RatingEntry:
     rank: int
-    user: User
+    user: Any
     is_current: bool
+    value: int
+
+
+@dataclass
+class LeaderboardUser:
+    telegram_id: int
+    fio: str | None
+    username: str | None
 
 
 @dataclass
@@ -41,14 +50,17 @@ class ResultsService:
         user = await self.users.get_by_telegram_id(telegram_id)
         if user is None or not user.test_solved:
             return None
+        session = await self.quiz.get_completed_session(user.id)
+        if session is None:
+            return None
         settings = await self.quiz.get_settings()
-        total = settings.questions_per_test if settings else 10
+        total = session.total_questions or (settings.questions_per_test if settings else 10)
         limit = settings.limit_score if settings else 5
         return UserResult(
             user=user,
-            final_score=user.score,
+            final_score=session.score,
             total_questions=total,
-            passed=user.score >= limit,
+            passed=session.score >= limit,
         )
 
     async def top_by_score(
@@ -60,6 +72,7 @@ class ResultsService:
                 rank=i + 1,
                 user=u,
                 is_current=u.telegram_id == telegram_id,
+                value=u.score or 0,
             )
             for i, u in enumerate(top)
         ]
@@ -67,15 +80,22 @@ class ResultsService:
     async def top_test_takers(
         self, telegram_id: int, limit: int = 30
     ) -> list[RatingEntry]:
-        top = await self.users.get_top_by_score_solved(limit)
-        return [
-            RatingEntry(
-                rank=i + 1,
-                user=u,
-                is_current=u.telegram_id == telegram_id,
+        rows = await self.quiz.get_top_latest_completed_sessions(limit)
+        entries: list[RatingEntry] = []
+        for i, row in enumerate(rows):
+            entries.append(
+                RatingEntry(
+                    rank=i + 1,
+                    user=LeaderboardUser(
+                        telegram_id=row["telegram_id"],
+                        fio=row.get("fio"),
+                        username=row.get("username"),
+                    ),
+                    is_current=row["telegram_id"] == telegram_id,
+                    value=int(row.get("score") or 0),
+                )
             )
-            for i, u in enumerate(top)
-        ]
+        return entries
 
     async def top_by_referrals(
         self, telegram_id: int, limit: int = 10
@@ -86,6 +106,7 @@ class ResultsService:
                 rank=i + 1,
                 user=u,
                 is_current=u.telegram_id == telegram_id,
+                value=u.referrals_count or 0,
             )
             for i, u in enumerate(top)
         ]

@@ -65,7 +65,7 @@ async def show_results(message: Message, session: AsyncSession) -> None:
         if detailed_result:
             time_line = f"\nSarflagan vaqt: <b>{_format_time(detailed_result.total_time_seconds)}</b>"
         lines.append(
-            f"Sizning natijangiz: <b>{result.user.score}/{result.total_questions}</b> — {time_line}\n"
+            f"Sizning natijangiz: <b>{result.final_score}/{result.total_questions}</b> — {time_line}\n"
         )
     else:
         lines.append("Siz hali test yechmagansiz.\n")
@@ -77,7 +77,7 @@ async def show_results(message: Message, session: AsyncSession) -> None:
                 _format_user_line(
                     entry.rank,
                     entry.user,
-                    entry.user.referrals_count or 0,
+                    entry.value,
                     entry.is_current,
                     "ta",
                 )
@@ -87,7 +87,7 @@ async def show_results(message: Message, session: AsyncSession) -> None:
     if top_test_takers:
         lines.append("<b>📝 Top 30 test yechganlar</b>")
         for entry in top_test_takers:
-            lines.append(_format_user_line(entry.rank, entry.user, entry.user.score or 0, entry.is_current))
+            lines.append(_format_user_line(entry.rank, entry.user, entry.value, entry.is_current))
 
     parts = _split_text("\n".join(lines))
     await _send_text_parts(message, parts, keyboard=inline.results_main_keyboard())
@@ -165,7 +165,7 @@ async def back_to_results(cb: CallbackQuery, session: AsyncSession) -> None:
         if detailed_result:
             time_line = f"\nSarflagan vaqt: <b>{_format_time(detailed_result.total_time_seconds)}</b>"
         lines.append(
-            f"Sizning natijangiz: <b>{result.user.score}/{result.total_questions}</b> — {time_line}\n"
+            f"Sizning natijangiz: <b>{result.final_score}/{result.total_questions}</b> — {time_line}\n"
         )
     else:
         lines.append("Siz hali test yechmagansiz.\n")
@@ -177,7 +177,7 @@ async def back_to_results(cb: CallbackQuery, session: AsyncSession) -> None:
                 _format_user_line(
                     entry.rank,
                     entry.user,
-                    entry.user.referrals_count or 0,
+                    entry.value,
                     entry.is_current,
                     "ta",
                 )
@@ -187,7 +187,7 @@ async def back_to_results(cb: CallbackQuery, session: AsyncSession) -> None:
     if top_test_takers:
         lines.append("<b>📝 Top 30 test yechganlar</b>")
         for entry in top_test_takers:
-            lines.append(_format_user_line(entry.rank, entry.user, entry.user.score or 0, entry.is_current))
+            lines.append(_format_user_line(entry.rank, entry.user, entry.value, entry.is_current))
 
     text = "\n".join(lines)
     parts = _split_text(text)

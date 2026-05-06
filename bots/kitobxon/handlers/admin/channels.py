@@ -1,9 +1,12 @@
+import json
+
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import reply
+from bots.kitobxon.repositories import ContentRepository
 from bots.kitobxon.services import AdminService
 from bots.kitobxon.states import AdminChannelStates, AdminZayafkaStates
 
@@ -12,6 +15,154 @@ router = Router(name="admin_channels")
 
 def _message_text(message: Message) -> str:
     return (message.text or message.caption or "").strip()
+
+
+def _draft_key(kind: str, telegram_id: int) -> str:
+    return f"draft:{kind}:{telegram_id}"
+
+
+def _normalize_channel_link(link: str, *, allow_skip: bool) -> str | None:
+    value = link.strip()
+    if allow_skip and value == "-":
+        return None
+    if value.startswith("https://t.me/") or value.startswith("http://t.me/"):
+        return value
+    if value.startswith("t.me/"):
+        return f"https://{value}"
+    return None
+
+
+async def _save_draft(
+    session: AsyncSession,
+    *,
+    kind: str,
+    telegram_id: int,
+    payload: dict,
+) -> None:
+    await ContentRepository(session).upsert(
+        _draft_key(kind, telegram_id),
+        text=json.dumps(payload, ensure_ascii=False),
+    )
+
+
+async def _load_draft(
+    session: AsyncSession,
+    *,
+    kind: str,
+    telegram_id: int,
+) -> dict | None:
+    obj = await ContentRepository(session).get_by_key(_draft_key(kind, telegram_id))
+    if obj is None or not obj.text:
+        return None
+    try:
+        return json.loads(obj.text)
+    except json.JSONDecodeError:
+        return None
+
+
+async def _clear_draft(session: AsyncSession, *, kind: str, telegram_id: int) -> None:
+    await ContentRepository(session).delete_by_key(_draft_key(kind, telegram_id))
+
+
+async def _set_kind_state(state: FSMContext, *, kind: str, step: str) -> None:
+    if kind == "channel":
+        mapping = {
+            "name": AdminChannelStates.waiting_name,
+            "link": AdminChannelStates.waiting_link,
+            "channel_id": AdminChannelStates.waiting_channel_id,
+        }
+    else:
+        mapping = {
+            "name": AdminZayafkaStates.waiting_name,
+            "link": AdminZayafkaStates.waiting_link,
+            "channel_id": AdminZayafkaStates.waiting_channel_id,
+        }
+    await state.set_state(mapping[step])
+
+
+async def _process_channel_draft(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+    *,
+    kind: str,
+) -> bool:
+    draft = await _load_draft(session, kind=kind, telegram_id=message.from_user.id)
+    if not draft:
+        return False
+
+    text = _message_text(message)
+    if not text:
+        await message.answer("Matn ko'rinishida yuboring.")
+        return True
+
+    if text == "Bekor qilish":
+        await _clear_draft(session, kind=kind, telegram_id=message.from_user.id)
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=reply.admin_channels_menu())
+        return True
+
+    step = draft.get("step")
+    if step == "name":
+        draft["name"] = text
+        draft["step"] = "link"
+        await _save_draft(session, kind=kind, telegram_id=message.from_user.id, payload=draft)
+        await _set_kind_state(state, kind=kind, step="link")
+        await message.answer(
+            "Kanal linkini kiriting (yoki - ni yuboring):"
+            if kind == "channel"
+            else "Zayafka kanal linkini kiriting:"
+        )
+        return True
+
+    if step == "link":
+        normalized_link = _normalize_channel_link(text, allow_skip=kind == "channel")
+        if normalized_link is None and not (kind == "channel" and text == "-"):
+            await message.answer(
+                "To'g'ri link yuboring. Masalan: https://t.me/kanal yoki t.me/kanal"
+            )
+            return True
+        draft["link"] = normalized_link
+        draft["step"] = "channel_id"
+        await _save_draft(session, kind=kind, telegram_id=message.from_user.id, payload=draft)
+        await _set_kind_state(state, kind=kind, step="channel_id")
+        await message.answer(
+            "Kanal ID sini kiriting (masalan: -1001234567890):"
+            if kind == "channel"
+            else "Zayafka kanal ID sini kiriting (masalan: -1001234567890):"
+        )
+        return True
+
+    if step == "channel_id":
+        try:
+            channel_id = int(text)
+        except ValueError:
+            await message.answer("ID son bo'lishi kerak. Masalan: -1001234567890")
+            return True
+
+        service = AdminService(session)
+        if kind == "channel":
+            await service.add_channel(
+                channel_id=channel_id,
+                name=draft["name"],
+                link=draft.get("link"),
+                traverse_text=None,
+            )
+            success_text = "Kanal qo'shildi."
+        else:
+            await service.add_zayafka_channel(
+                channel_id=channel_id,
+                name=draft["name"],
+                link=draft.get("link"),
+            )
+            success_text = "Yopiq kanal qo'shildi."
+
+        await _clear_draft(session, kind=kind, telegram_id=message.from_user.id)
+        await state.clear()
+        await message.answer(success_text, reply_markup=reply.admin_channels_menu())
+        return True
+
+    return False
 
 
 async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
@@ -100,50 +251,33 @@ async def delete_channel(cb: CallbackQuery, session: AsyncSession) -> None:
 async def start_add_channel(message: Message, state: FSMContext, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
+    await _save_draft(
+        session,
+        kind="channel",
+        telegram_id=message.from_user.id,
+        payload={"step": "name"},
+    )
     await state.set_state(AdminChannelStates.waiting_name)
     await message.answer("Kanal nomini kiriting:", reply_markup=reply.cancel_only())
 
 
 @router.message(AdminChannelStates.waiting_name)
-async def channel_name(message: Message, state: FSMContext) -> None:
-    text = _message_text(message)
-    if not text:
-        await message.answer("Kanal nomini matn ko'rinishida yuboring.")
-        return
-    await state.update_data(ch_name=text)
-    await state.set_state(AdminChannelStates.waiting_link)
-    await message.answer("Kanal linkini kiriting (yoki - ni yuboring):")
+async def channel_name(message: Message, state: FSMContext, session: AsyncSession) -> None:
+    await _process_channel_draft(message, state, session, kind="channel")
 
 
 @router.message(AdminChannelStates.waiting_link)
-async def channel_link(message: Message, state: FSMContext) -> None:
-    link = _message_text(message)
-    if not link:
-        await message.answer("Kanal linkini matn ko'rinishida yuboring.")
-        return
-    await state.update_data(ch_link=link if link != "-" else None)
-    await state.set_state(AdminChannelStates.waiting_channel_id)
-    await message.answer("Kanal ID sini kiriting (masalan: -1001234567890):")
+async def channel_link(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    await _process_channel_draft(message, state, session, kind="channel")
 
 
 @router.message(AdminChannelStates.waiting_channel_id)
 async def channel_id_input(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
-    try:
-        ch_id = int(_message_text(message))
-    except ValueError:
-        await message.answer("ID son bo'lishi kerak:")
-        return
-    data = await state.get_data()
-    await AdminService(session).add_channel(
-        channel_id=ch_id,
-        name=data["ch_name"],
-        link=data.get("ch_link"),
-        traverse_text=None,
-    )
-    await state.clear()
-    await message.answer("Kanal qo'shildi.", reply_markup=reply.admin_channels_menu())
+    await _process_channel_draft(message, state, session, kind="channel")
 
 
 # ---------------------------------------------------------------
@@ -202,46 +336,45 @@ async def start_add_zayafka(
 ) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
+    await _save_draft(
+        session,
+        kind="zch",
+        telegram_id=message.from_user.id,
+        payload={"step": "name"},
+    )
     await state.set_state(AdminZayafkaStates.waiting_name)
     await message.answer("Yopiq kanal nomini kiriting:", reply_markup=reply.cancel_only())
 
 
 @router.message(AdminZayafkaStates.waiting_name)
-async def zayafka_name(message: Message, state: FSMContext) -> None:
-    text = _message_text(message)
-    if not text:
-        await message.answer("Yopiq kanal nomini matn ko'rinishida yuboring.")
-        return
-    await state.update_data(zch_name=text)
-    await state.set_state(AdminZayafkaStates.waiting_link)
-    await message.answer("Zayafka kanal linkini kiriting:")
+async def zayafka_name(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    await _process_channel_draft(message, state, session, kind="zch")
 
 
 @router.message(AdminZayafkaStates.waiting_link)
-async def zayafka_link(message: Message, state: FSMContext) -> None:
-    link = _message_text(message)
-    if not link:
-        await message.answer("Yopiq kanal linkini matn ko'rinishida yuboring.")
-        return
-    await state.update_data(zch_link=link)
-    await state.set_state(AdminZayafkaStates.waiting_channel_id)
-    await message.answer("Zayafka kanal ID sini kiriting:")
+async def zayafka_link(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    await _process_channel_draft(message, state, session, kind="zch")
 
 
 @router.message(AdminZayafkaStates.waiting_channel_id)
 async def zayafka_channel_id(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
-    try:
-        ch_id = int(_message_text(message))
-    except ValueError:
-        await message.answer("ID son bo'lishi kerak:")
+    await _process_channel_draft(message, state, session, kind="zch")
+
+
+@router.message()
+async def continue_channel_draft(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    if not await _is_admin(session, message.from_user.id):
         return
-    data = await state.get_data()
-    await AdminService(session).add_zayafka_channel(
-        channel_id=ch_id,
-        name=data["zch_name"],
-        link=data.get("zch_link"),
-    )
-    await state.clear()
-    await message.answer("Yopiq kanal qo'shildi.", reply_markup=reply.admin_channels_menu())
+    if await _process_channel_draft(message, state, session, kind="channel"):
+        return
+    await _process_channel_draft(message, state, session, kind="zch")
