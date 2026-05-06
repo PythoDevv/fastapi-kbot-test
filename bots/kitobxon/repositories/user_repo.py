@@ -6,6 +6,7 @@ from bots.kitobxon.repositories.base import BaseRepository
 
 class UserRepository(BaseRepository[User]):
     model = User
+    BULK_LOOKUP_CHUNK_SIZE = 5000
 
     async def get_by_telegram_id(self, telegram_id: int) -> User | None:
         return await self.get_by(telegram_id=telegram_id)
@@ -71,6 +72,19 @@ class UserRepository(BaseRepository[User]):
             .order_by(User.id)
         )
         return list((await self.session.execute(stmt)).scalars().all())
+
+    async def get_by_telegram_ids(self, telegram_ids: list[int]) -> dict[int, User]:
+        if not telegram_ids:
+            return {}
+
+        users_by_tid: dict[int, User] = {}
+        for start in range(0, len(telegram_ids), self.BULK_LOOKUP_CHUNK_SIZE):
+            chunk = telegram_ids[start:start + self.BULK_LOOKUP_CHUNK_SIZE]
+            stmt = select(User).where(User.telegram_id.in_(chunk))
+            users = (await self.session.execute(stmt)).scalars().all()
+            for user in users:
+                users_by_tid[user.telegram_id] = user
+        return users_by_tid
 
     async def count_confirmed_referrals(self, referrer_telegram_id: int) -> int:
         stmt = select(func.count()).select_from(User).where(

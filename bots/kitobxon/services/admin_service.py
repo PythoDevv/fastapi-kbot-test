@@ -130,29 +130,32 @@ class AdminService:
         created = 0
         skipped = 0
 
+        deduplicated: dict[int, dict] = {}
         for data in users_data:
             telegram_id = data.get("telegram_id")
             if not telegram_id:
                 skipped += 1
                 continue
+            deduplicated[telegram_id] = data
 
-            user = await self.users.get_by_telegram_id(telegram_id)
+        existing_users = await self.users.get_by_telegram_ids(list(deduplicated))
+        new_users: list[User] = []
 
+        for telegram_id, data in deduplicated.items():
+            user = existing_users.get(telegram_id)
             if user:
-                # Update existing user
-                await self.users.update_fields(
-                    telegram_id,
-                    fio=data.get("fio") or user.fio,
-                    username=data.get("username") or user.username,
-                    mobile_number=data.get("mobile_number") or user.mobile_number,
-                    referrals_count=data.get("referrals_count", user.referrals_count),
-                    score=data.get("score", user.score),
-                    referred_by=data.get("referred_by") or user.referred_by,
-                )
+                user.fio = data.get("fio") or user.fio
+                user.username = data.get("username") or user.username
+                user.mobile_number = data.get("mobile_number") or user.mobile_number
+                user.referrals_count = data.get("referrals_count", user.referrals_count)
+                user.score = data.get("score", user.score)
+                user.referred_by = data.get("referred_by") or user.referred_by
+                user.is_registered = True
                 updated += 1
-            else:
-                # Create new user
-                new_user = User(
+                continue
+
+            new_users.append(
+                User(
                     telegram_id=telegram_id,
                     fio=data.get("fio"),
                     username=data.get("username"),
@@ -162,8 +165,11 @@ class AdminService:
                     referred_by=data.get("referred_by"),
                     is_registered=True,
                 )
-                await self.users.add(new_user)
-                created += 1
+            )
+            created += 1
+
+        if new_users:
+            self.session.add_all(new_users)
 
         await self.session.commit()
         return updated, created, skipped

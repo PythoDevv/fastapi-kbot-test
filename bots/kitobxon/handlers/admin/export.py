@@ -199,31 +199,22 @@ async def start_users_import(
     )
 
 
-@router.message(AdminImportStates.waiting_users_file)
+@router.message(AdminImportStates.waiting_users_file, F.document)
 async def import_users_file(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
     """Receive and process imported users file"""
-    if message.text == "Bekor qilish":
-        await state.clear()
-        await message.answer("Bekor qilindi.", reply_markup=reply.admin_panel())
-        return
-
-    if not message.document:
-        await message.answer("Iltimos, Excel (.xlsx) yoki CSV (.csv) fayl yuboring:")
-        return
-
     doc: Document = message.document
 
     # Check file extension
-    file_name = doc.file_name or ""
-    if not (file_name.endswith('.xlsx') or file_name.endswith('.csv')):
+    file_name = (doc.file_name or "").lower()
+    if not (file_name.endswith(".xlsx") or file_name.endswith(".csv")):
         await message.answer("❌ Fayl formati noto'g'ri.\nFaqat .xlsx yoki .csv fayllar qabul qilinadi.")
         return
 
     # Download file
     file = await message.bot.get_file(doc.file_id)
-    file_ext = ".xlsx" if file_name.endswith('.xlsx') else ".csv"
+    file_ext = ".xlsx" if file_name.endswith(".xlsx") else ".csv"
     with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
         await message.bot.download_file(file.file_path, tmp)
         tmp_path = tmp.name
@@ -265,3 +256,15 @@ async def import_users_file(
         await state.clear()
     finally:
         os.unlink(tmp_path)
+
+
+@router.message(AdminImportStates.waiting_users_file)
+async def import_users_file_fallback(
+    message: Message, state: FSMContext
+) -> None:
+    if message.text == "Bekor qilish":
+        await state.clear()
+        await message.answer("Bekor qilindi.", reply_markup=reply.admin_panel())
+        return
+
+    await message.answer("Iltimos, Excel (.xlsx) yoki CSV (.csv) fayl yuboring:")
