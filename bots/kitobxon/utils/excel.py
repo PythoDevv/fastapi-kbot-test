@@ -382,24 +382,26 @@ def import_users_from_excel(path: str) -> tuple[list[dict[str, Any]], list[str]]
     users = []
     errors = []
     rows = []
-    is_csv_format = False
+    header_map: dict[str, int] = {}
 
     try:
         if path.endswith('.xlsx'):
             wb = openpyxl.load_workbook(path)
             ws = wb.active
-            for row in ws.iter_rows(min_row=2, values_only=True):
+            header = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), None)
+            if header:
+                header_map = _detect_user_import_header_map(list(header))
+            start_row = 2 if header_map else 1
+            for row in ws.iter_rows(min_row=start_row, values_only=True):
                 rows.append(list(row) if row else [])
         elif path.endswith('.csv'):
             with open(path, 'r', encoding='utf-8') as f:
                 reader = csv.reader(f)
-                header = next(reader, None)  # Read header
-                # Detect format based on header
-                if header and len(header) > 8:
-                    header_lower = [h.lower() if h else "" for h in header]
-                    # Check if it's CSV format by looking for specific columns
-                    if any("telegram" in h for h in header_lower):
-                        is_csv_format = True
+                header = next(reader, None)
+                if header:
+                    header_map = _detect_user_import_header_map(header)
+                    if not header_map:
+                        rows.append(header)
                 for row in reader:
                     rows.append(row)
         else:
@@ -414,35 +416,51 @@ def import_users_from_excel(path: str) -> tuple[list[dict[str, Any]], list[str]]
             continue
 
         try:
-            if is_csv_format:
-                # CSV format: Telegram ID is in column I (index 8)
-                tid_raw = row[8] if len(row) > 8 else row[0]  # Fallback to column A
+            if header_map:
+                tid_raw = _get_row_value(row, header_map, "telegram_id")
             else:
-                # Standard format: Telegram ID is in column A (index 0)
-                tid_raw = row[0] if len(row) > 0 else None
+                tid_raw = _get_legacy_import_value(row, field="telegram_id")
 
             if not tid_raw or str(tid_raw).strip() == "":
                 errors.append(f"Qator {row_idx}: Telegram ID yo'q.")
                 continue
 
-            telegram_id = int(float(str(tid_raw).strip()))
+            telegram_id = _to_int_value(tid_raw)
 
-            if is_csv_format:
-                # CSV format mapping
-                fio = str(row[1]).strip() if len(row) > 1 and row[1] else None
-                username = str(row[2]).strip() if len(row) > 2 and row[2] else None
-                mobile_number = str(row[3]).strip() if len(row) > 3 and row[3] else None
-                referrals_count = int(float(str(row[4]).strip())) if len(row) > 4 and row[4] else 0
-                score = int(float(str(row[5]).strip())) if len(row) > 5 and row[5] else 0
-                referred_by = int(float(str(row[7]).strip())) if len(row) > 7 and row[7] else None
+            if header_map:
+                fio = _clean_text(_get_row_value(row, header_map, "fio"))
+                username = _normalize_username(_clean_text(_get_row_value(row, header_map, "username")))
+                mobile_number = _clean_text(_get_row_value(row, header_map, "mobile_number"))
+                referrals_count = _to_int_value(
+                    _get_row_value(row, header_map, "referrals_count"),
+                    default=0,
+                )
+                score = _to_int_value(
+                    _get_row_value(row, header_map, "score"),
+                    default=0,
+                )
+                referred_by = _to_int_value(
+                    _get_row_value(row, header_map, "referred_by"),
+                    default=None,
+                )
             else:
-                # Standard format mapping
-                fio = str(row[1]).strip() if len(row) > 1 and row[1] else None
-                username = str(row[2]).strip() if len(row) > 2 and row[2] else None
-                mobile_number = str(row[3]).strip() if len(row) > 3 and row[3] else None
-                referrals_count = int(float(str(row[4]).strip())) if len(row) > 4 and row[4] else 0
-                score = int(float(str(row[5]).strip())) if len(row) > 5 and row[5] else 0
-                referred_by = int(float(str(row[6]).strip())) if len(row) > 6 and row[6] else None
+                fio = _clean_text(_get_legacy_import_value(row, field="fio"))
+                username = _normalize_username(
+                    _clean_text(_get_legacy_import_value(row, field="username"))
+                )
+                mobile_number = _clean_text(_get_legacy_import_value(row, field="mobile_number"))
+                referrals_count = _to_int_value(
+                    _get_legacy_import_value(row, field="referrals_count"),
+                    default=0,
+                )
+                score = _to_int_value(
+                    _get_legacy_import_value(row, field="score"),
+                    default=0,
+                )
+                referred_by = _to_int_value(
+                    _get_legacy_import_value(row, field="referred_by"),
+                    default=None,
+                )
 
             users.append({
                 "telegram_id": telegram_id,
@@ -459,3 +477,82 @@ def import_users_from_excel(path: str) -> tuple[list[dict[str, Any]], list[str]]
             errors.append(f"Qator {row_idx}: {e}")
 
     return users, errors
+
+
+def _normalize_header_name(value: Any) -> str:
+    return str(value or "").strip().lower().replace("’", "'")
+
+
+def _detect_user_import_header_map(header: list[Any]) -> dict[str, int]:
+    aliases = {
+        "telegram_id": {"telegram id", "telegram id raqami", "tg id", "id telegram"},
+        "fio": {"fio", "f.i.o", "full name", "ism familiya"},
+        "username": {"username", "user name", "login"},
+        "mobile_number": {"telefon", "phone", "phone number", "mobile number", "mobile"},
+        "referrals_count": {"referallar", "referals", "referrals", "referrals count"},
+        "score": {"ball", "score"},
+        "referred_by": {"kim taklif qildi", "kim taklif qildi (id)", "referred by", "referrer id"},
+    }
+    detected: dict[str, int] = {}
+    for index, column_name in enumerate(header):
+        normalized = _normalize_header_name(column_name)
+        for field_name, names in aliases.items():
+            if normalized in names:
+                detected[field_name] = index
+                break
+    return detected
+
+
+def _get_row_value(row: list[Any], header_map: dict[str, int], field: str) -> Any:
+    index = header_map.get(field)
+    if index is None or index >= len(row):
+        return None
+    return row[index]
+
+
+def _get_legacy_import_value(row: list[Any], field: str) -> Any:
+    csv_like_indexes = {
+        "telegram_id": 8,
+        "fio": 1,
+        "username": 2,
+        "mobile_number": 3,
+        "referrals_count": 4,
+        "score": 5,
+        "referred_by": 7,
+    }
+    standard_indexes = {
+        "telegram_id": 0,
+        "fio": 1,
+        "username": 2,
+        "mobile_number": 3,
+        "referrals_count": 4,
+        "score": 5,
+        "referred_by": 6,
+    }
+    preferred_indexes = csv_like_indexes if len(row) > 8 else standard_indexes
+    index = preferred_indexes[field]
+    if index >= len(row):
+        return None
+    return row[index]
+
+
+def _clean_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _normalize_username(value: str | None) -> str | None:
+    if not value:
+        return None
+    return value.lstrip("@").strip() or None
+
+
+def _to_int_value(value: Any, default: int | None = None) -> int | None:
+    if value is None:
+        return default
+    text = str(value).strip()
+    if not text:
+        return default
+    return int(float(text))

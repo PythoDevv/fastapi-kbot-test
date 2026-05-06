@@ -1,13 +1,11 @@
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State
-from aiogram.filters import StateFilter
 from aiogram.types import BufferedInputFile, CallbackQuery, Document, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import inline, reply
 from bots.kitobxon.services import AdminService
-from bots.kitobxon.states import AdminImportStates, AdminQuestionStates, AdminQuestionImportStates
+from bots.kitobxon.states import AdminQuestionStates, AdminQuestionImportStates
 from core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -275,6 +273,7 @@ async def cancel_import_questions(message: Message, state: FSMContext) -> None:
 
 # Excel/CSV import
 @router.message(
+    AdminQuestionImportStates.waiting_file,
     F.document,
     F.document.mime_type.in_(
         [
@@ -282,7 +281,6 @@ async def cancel_import_questions(message: Message, state: FSMContext) -> None:
             "text/csv",
         ]
     ),
-    ~StateFilter(AdminImportStates.waiting_users_file),
 )
 async def import_questions_excel(
     message: Message, session: AsyncSession, bot: Bot

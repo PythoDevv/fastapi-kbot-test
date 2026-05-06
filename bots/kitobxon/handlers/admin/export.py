@@ -193,6 +193,7 @@ async def start_users_import(
         "  Column G: Javoblar\n"
         "  Column H: Kim taklif qildi (ID)\n"
         "  Column I: Telegram ID raqami\n\n"
+        "Bot eksport qilgan <b>users.xlsx</b> fayli ham qabul qilinadi.\n\n"
         "Excel yoki CSV faylini yuboring:",
         reply_markup=reply.cancel_only(),
     )
@@ -244,6 +245,7 @@ async def import_users_file(
             f"<b>✅ Import tamomlandi!</b>\n\n"
             f"➕ Yangi: <b>{created}</b>\n"
             f"🔄 Yangilangan: <b>{updated}</b>\n"
+            f"⏭ O'tkazib yuborildi: <b>{skipped}</b>\n"
             f"📊 Jami: <b>{len(users_data)}</b>"
         )
 
