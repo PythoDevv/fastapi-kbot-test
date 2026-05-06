@@ -11,12 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.exceptions import (
     AlreadySolvedError,
-    QuizAlreadyStartedError,
     QuizFinishedError,
     QuizNotActiveError,
     QuizWaitingError,
 )
-from bots.kitobxon.repositories import UserRepository
 from bots.kitobxon.services import QuizService
 from bots.kitobxon.webapp.auth import (
     get_token_from_header,
@@ -110,19 +108,7 @@ async def start_quiz(
 
     service = QuizService(db)
     try:
-        result = await service.start_session(telegram_id)
-    except QuizAlreadyStartedError:
-        user_repo = UserRepository(db)
-        user = await user_repo.get_by_telegram_id(telegram_id)
-        active = await service.quiz.get_active_session(user.id)
-        payload = await service.get_current_payload(active.id)
-        settings_obj = await service.quiz.get_settings()
-        return StartResponse(
-            session_id=active.id,
-            question=_q_out(payload),
-            total=active.total_questions,
-            time_limit_seconds=settings_obj.time_limit_seconds,
-        )
+        result = await service.resume_or_start_session(telegram_id)
     except QuizWaitingError:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="waiting")
@@ -162,9 +148,21 @@ async def submit_answer(
             time_taken=time_taken_sec,
             is_timeout=is_timeout,
         )
+        response_session_id = body.session_id
     except (QuizNotActiveError, QuizFinishedError) as e:
+        detail = str(e)
+        if isinstance(e, QuizNotActiveError) and detail == "Session topilmadi":
+            recovered = await service.resume_or_start_session(telegram_id)
+            return AnswerResponse(
+                session_id=recovered.session.id,
+                score=recovered.session.score,
+                is_last=False,
+                next_question=_q_out(recovered.first_question),
+                total_questions=recovered.session.total_questions,
+                total_time_seconds=0,
+            )
         from fastapi import HTTPException
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=detail)
 
     if result.is_last:
         try:
@@ -178,6 +176,7 @@ async def submit_answer(
             logger.exception("Failed to send WebApp result message user=%s", telegram_id)
 
     return AnswerResponse(
+        session_id=response_session_id,
         score=result.score,
         is_last=result.is_last,
         next_question=_q_out(result.next_question) if result.next_question else None,

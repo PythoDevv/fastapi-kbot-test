@@ -1,4 +1,5 @@
 from aiogram import Bot, F, Router
+from aiogram.filters import Filter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,10 +13,42 @@ from core.logging import get_logger
 logger = get_logger(__name__)
 router = Router(name="auth")
 
+_NON_NAME_TEXTS = {
+    "Bekor qilish",
+    "📱 Telefon raqamni yuborish",
+    "💠 Do'stlarni taklif qilish",
+    "Test savollarini ishlash 🧑‍💻",
+    "🌟 Natijalar",
+    "📝 Tanlov shartlari",
+    "Tanlov kitoblari 📚",
+    "Viktorina sovg'alari 🎁",
+    "Ismni o'zgartirish ✏️",
+    "🏠 Asosiy menyu",
+    "🔙 Admin panel",
+}
 
-@router.message(AuthStates.awaiting_name)
-async def handle_name_input(
-    message: Message, state: FSMContext, session: AsyncSession, bot: Bot
+
+class AwaitingNameFallback(Filter):
+    async def __call__(
+        self,
+        message: Message,
+        state: FSMContext,
+        session: AsyncSession,
+    ) -> bool:
+        text = (message.text or "").strip()
+        if not text or text.startswith("/") or text in _NON_NAME_TEXTS:
+            return False
+        if await state.get_state() is not None:
+            return False
+        user = await UserRepository(session).get_by_telegram_id(message.from_user.id)
+        return bool(user and not user.is_registered and not user.mobile_number)
+
+
+async def _handle_name_submission(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+    bot: Bot,
 ) -> None:
     text = (message.text or "").strip()
     if text == "Bekor qilish":
@@ -23,7 +56,7 @@ async def handle_name_input(
         user_repo = UserRepository(session)
         user = await user_repo.get_by_telegram_id(message.from_user.id)
         if user and user.is_admin:
-            await message.answer("Admin panel:", reply_markup=reply.admin_panel())
+            await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
         else:
             await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
         return
@@ -35,7 +68,6 @@ async def handle_name_input(
     auth = AuthService(session)
     await auth.set_name(message.from_user.id, text)
 
-    # Check if phone number is required
     quiz_repo = QuizRepository(session)
     settings = await quiz_repo.get_settings()
     require_phone = settings.require_phone_number if settings else False
@@ -46,9 +78,23 @@ async def handle_name_input(
             "Telefon raqamingizni yuboring:",
             reply_markup=reply.phone_request(),
         )
-    else:
-        # Skip phone and finish registration
-        await _finish_registration(message, state, session, bot, phone="")
+        return
+
+    await _finish_registration(message, state, session, bot, phone="")
+
+
+@router.message(AuthStates.awaiting_name)
+async def handle_name_input(
+    message: Message, state: FSMContext, session: AsyncSession, bot: Bot
+) -> None:
+    await _handle_name_submission(message, state, session, bot)
+
+
+@router.message(AwaitingNameFallback())
+async def handle_name_input_without_state(
+    message: Message, state: FSMContext, session: AsyncSession, bot: Bot
+) -> None:
+    await _handle_name_submission(message, state, session, bot)
 
 
 @router.message(AuthStates.awaiting_phone, F.contact)

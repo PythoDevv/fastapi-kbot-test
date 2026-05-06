@@ -20,8 +20,8 @@ class UserRepository(BaseRepository[User]):
             .values(
                 telegram_id=telegram_id,
                 username=username or "",
-                fio=fio or "",
-                step=1,
+                fio=fio or None,
+                step=0,
             )
             .on_conflict_do_nothing(index_elements=[User.telegram_id])
         )

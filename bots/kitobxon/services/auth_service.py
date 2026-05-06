@@ -26,7 +26,7 @@ class AuthService:
         user, created = await self.users.get_or_create(
             telegram_id=telegram_id,
             username=username,
-            fio=first_name,
+            fio=None,
         )
         if not created and user.username != (username or "") and username:
             user.username = username
@@ -34,7 +34,7 @@ class AuthService:
 
     async def set_name(self, telegram_id: int, fio: str) -> User:
         fio = fio.strip()
-        await self.users.update_fields(telegram_id, fio=fio)
+        await self.users.update_fields(telegram_id, fio=fio, step=1)
         user = await self.users.get_by_telegram_id(telegram_id)
         assert user is not None
         return user

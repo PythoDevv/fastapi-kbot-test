@@ -6,6 +6,8 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import inline, reply
+from bots.kitobxon.models import User
+from bots.kitobxon.repositories import QuizRepository
 from bots.kitobxon.services import AuthService, SubsService
 from bots.kitobxon.states import AuthStates
 from core.logging import get_logger
@@ -23,17 +25,38 @@ def _subscription_prompt_text(has_missing: bool) -> str:
 async def _continue_after_subscription(
     message: Message,
     state: FSMContext,
-    is_registered: bool,
-) -> None:
-    if is_registered:
+    session: AsyncSession,
+    user: User,
+) -> bool:
+    if user.is_registered:
         await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
-        return
+        return True
+
+    settings = await QuizRepository(session).get_settings()
+    require_phone = settings.require_phone_number if settings else False
+    has_name = user.step >= 1 and bool((user.fio or "").strip())
+
+    if has_name:
+        has_phone = bool((user.mobile_number or "").strip())
+        if require_phone and not has_phone:
+            await state.set_state(AuthStates.awaiting_phone)
+            await message.answer(
+                "Telefon raqamingizni yuboring:",
+                reply_markup=reply.phone_request(),
+            )
+            return False
+
+        await AuthService(session).mark_registered(user.telegram_id)
+        await state.clear()
+        await message.answer("Tabriklaymiz! Ro'yxatdan o'tdingiz.", reply_markup=reply.main_menu())
+        return True
 
     await state.set_state(AuthStates.awaiting_name)
     await message.answer(
         "Assalomu alaykum! Ismingiz va familiyangizni kiriting:",
         reply_markup=reply.REMOVE,
     )
+    return False
 
 
 @router.message(CommandStart())
@@ -51,7 +74,7 @@ async def cmd_start(
 
     # Parse referral
     args = message.text.split(maxsplit=1)
-    if len(args) > 1 and result.is_new:
+    if len(args) > 1 and not result.user.is_registered:
         try:
             referrer_id = int(args[1])
             await auth.apply_referral(result.user, referrer_id)
@@ -71,20 +94,22 @@ async def cmd_start(
             )
             return
 
-    referral_result = await auth.award_referral_bonus_if_eligible(message.from_user.id)
-    if referral_result:
-        referrer_id, referrer_referrals = referral_result
-        await bot.send_message(
-            referrer_id,
-            f"{result.user.fio or result.user.username or message.from_user.first_name} "
-            "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
-            f"Referallar soni: <b>{referrer_referrals}</b>",
-        )
-    await _continue_after_subscription(
+    is_registered = await _continue_after_subscription(
         message,
         state,
-        result.user.is_registered,
+        session,
+        result.user,
     )
+    if is_registered:
+        referral_result = await auth.award_referral_bonus_if_eligible(message.from_user.id)
+        if referral_result:
+            referrer_id, referrer_referrals = referral_result
+            await bot.send_message(
+                referrer_id,
+                f"{result.user.fio or result.user.username or message.from_user.first_name} "
+                "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
+                f"Referallar soni: <b>{referrer_referrals}</b>",
+            )
 
 
 @router.callback_query(F.data == "check_subscription")
@@ -102,7 +127,8 @@ async def check_subscription(
         await _continue_after_subscription(
             cb.message,
             state,
-            result.user.is_registered,
+            session,
+            result.user,
         )
         await cb.answer()
         return
@@ -112,20 +138,22 @@ async def check_subscription(
 
     if status.all_subscribed:
         await cb.message.delete()
-        referral_result = await auth.award_referral_bonus_if_eligible(cb.from_user.id)
-        if referral_result:
-            referrer_id, referrer_referrals = referral_result
-            await bot.send_message(
-                referrer_id,
-                f"{result.user.fio or result.user.username or cb.from_user.first_name} "
-                "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
-                f"Referallar soni: <b>{referrer_referrals}</b>",
-            )
-        await _continue_after_subscription(
+        is_registered = await _continue_after_subscription(
             cb.message,
             state,
-            result.user.is_registered,
+            session,
+            result.user,
         )
+        if is_registered:
+            referral_result = await auth.award_referral_bonus_if_eligible(cb.from_user.id)
+            if referral_result:
+                referrer_id, referrer_referrals = referral_result
+                await bot.send_message(
+                    referrer_id,
+                    f"{result.user.fio or result.user.username or cb.from_user.first_name} "
+                    "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
+                    f"Referallar soni: <b>{referrer_referrals}</b>",
+                )
     else:
         text = _subscription_prompt_text(True)
         markup = inline.subscription_keyboard(

@@ -64,6 +64,35 @@ class QuizService:
             raise QuizNotActiveError()
         return settings
 
+    async def resume_or_start_session(self, telegram_id: int) -> StartResult:
+        user = await self.users.get_by_telegram_id(telegram_id)
+        if user is None:
+            raise UserNotFoundError(telegram_id)
+        if not user.is_registered:
+            raise UserNotRegisteredError()
+        if user.test_solved:
+            raise AlreadySolvedError()
+
+        settings = await self.get_settings()
+        if settings.waiting:
+            raise QuizWaitingError()
+        if settings.finished:
+            raise QuizFinishedError()
+
+        active = await self.quiz.get_active_session(user.id)
+        if active is not None:
+            payload = await self.get_current_payload(active.id)
+            if payload is not None:
+                return StartResult(
+                    session=active,
+                    quiz_type=active.quiz_type,
+                    settings=settings,
+                    first_question=payload,
+                )
+            await self.quiz.abandon_active_session(user.id)
+
+        return await self.start_session(telegram_id)
+
     # ---------- Start ----------
     async def start_session(self, telegram_id: int) -> StartResult:
         user = await self.users.get_by_telegram_id(telegram_id)

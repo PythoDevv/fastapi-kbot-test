@@ -30,6 +30,7 @@ class AnswerRequest(BaseModel):
 
 
 class AnswerResponse(BaseModel):
+    session_id: int | None = None
     score: int
     is_last: bool
     next_question: QuestionOut | None = None

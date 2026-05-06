@@ -340,6 +340,10 @@ async function submitAnswer(answer) {
       time_taken_ms: timeTakenMs,
     });
 
+    if (res.session_id) {
+      sessionId = res.session_id;
+    }
+
     if (res.is_last) {
       showResult(res.score, res.total_questions, res.total_time_seconds);
     } else {
