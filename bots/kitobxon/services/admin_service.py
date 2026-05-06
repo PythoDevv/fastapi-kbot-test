@@ -177,8 +177,8 @@ class AdminService:
             )
 
         update_stmt = (
-            update(User)
-            .where(User.id == bindparam("target_user_id"))
+            update(User.__table__)
+            .where(User.__table__.c.id == bindparam("target_user_id"))
             .values(score=bindparam("target_new_score"))
             .execution_options(synchronize_session=False)
         )
