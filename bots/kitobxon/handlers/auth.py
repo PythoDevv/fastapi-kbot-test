@@ -102,7 +102,7 @@ async def _finish_registration(
             referrer_id,
             f"{message.from_user.full_name or message.from_user.first_name or message.from_user.username} "
             "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
-            f"Sizdagi referallar soni: <b>{referrer_referrals}</b>",
+            f"Referallar soni: <b>{referrer_referrals}</b>",
         )
     await message.answer("Tabriklaymiz! Ro'yxatdan o'tdingiz.", reply_markup=reply.main_menu())
 
