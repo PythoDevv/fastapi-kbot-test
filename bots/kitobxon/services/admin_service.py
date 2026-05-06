@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
+from sqlalchemy import bindparam, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.cache import runtime_cache
@@ -23,6 +24,20 @@ class AdminStats:
     registered_users: int
     solved_users: int
     total_questions: int
+
+
+@dataclass
+class ReferralScoreRepairPreview:
+    candidates: list
+    affected_count: int
+    total_added: int
+
+
+@dataclass
+class ReferralScoreRepairResult:
+    updated_users: list
+    affected_count: int
+    total_added: int
 
 
 class AdminService:
@@ -123,6 +138,79 @@ class AdminService:
     async def clear_all_solved(self) -> None:
         """Clear test_solved status for all users"""
         await self.users.update_all(test_solved=False)
+
+    async def preview_referral_score_repair(
+        self,
+        *,
+        score_threshold: int = 10,
+        referral_cap: int = 5,
+    ) -> ReferralScoreRepairPreview:
+        candidates = await self.users.get_referral_score_repair_candidates(
+            score_threshold=score_threshold,
+            referral_cap=referral_cap,
+        )
+        total_added = sum(max(item.new_score - item.old_score, 0) for item in candidates)
+        return ReferralScoreRepairPreview(
+            candidates=candidates,
+            affected_count=len(candidates),
+            total_added=total_added,
+        )
+
+    async def apply_referral_score_repair(
+        self,
+        *,
+        admin_telegram_id: int,
+        admin_fio: str | None,
+        score_threshold: int = 10,
+        referral_cap: int = 5,
+    ) -> ReferralScoreRepairResult:
+        preview = await self.preview_referral_score_repair(
+            score_threshold=score_threshold,
+            referral_cap=referral_cap,
+        )
+        candidates = preview.candidates
+        if not candidates:
+            return ReferralScoreRepairResult(
+                updated_users=[],
+                affected_count=0,
+                total_added=0,
+            )
+
+        update_stmt = (
+            update(User)
+            .where(User.id == bindparam("target_user_id"))
+            .values(score=bindparam("target_new_score"))
+            .execution_options(synchronize_session=False)
+        )
+        params = [
+            {
+                "target_user_id": item.user_id,
+                "target_new_score": item.new_score,
+            }
+            for item in candidates
+        ]
+        await self.session.execute(update_stmt, params)
+
+        for item in candidates:
+            await self.score_log.log(
+                admin_telegram_id=admin_telegram_id,
+                admin_fio=admin_fio,
+                target_telegram_id=item.telegram_id,
+                target_fio=item.fio,
+                old_score=item.old_score,
+                new_score=item.new_score,
+                reason=(
+                    f"Referral repair: {item.referral_count} ta referral asosida "
+                    f"{item.old_score} -> {item.new_score} (cap={referral_cap})"
+                ),
+            )
+
+        await self.session.flush()
+        return ReferralScoreRepairResult(
+            updated_users=candidates,
+            affected_count=preview.affected_count,
+            total_added=preview.total_added,
+        )
 
     async def import_users(self, users_data: list[dict]) -> tuple[int, int, int]:
         """Import users from excel data. Returns (updated, created, skipped)"""

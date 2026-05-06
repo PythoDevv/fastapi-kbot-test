@@ -189,6 +189,23 @@ def admin_stats_keyboard() -> InlineKeyboardMarkup:
     )
 
 
+def referral_score_repair_confirm_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Ha, aylantirish",
+                    callback_data="admin_referral_repair_confirm",
+                ),
+                InlineKeyboardButton(
+                    text="❌ Bekor qilish",
+                    callback_data="admin_referral_repair_cancel",
+                ),
+            ]
+        ]
+    )
+
+
 def content_list_keyboard(contents: list | None = None) -> InlineKeyboardMarkup:
     """Keyboard with content items to manage — dynamic from DB + add button"""
     from bots.kitobxon.models import ContentText

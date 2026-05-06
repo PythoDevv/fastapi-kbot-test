@@ -1,8 +1,20 @@
+from dataclasses import dataclass
+
 from sqlalchemy import delete, desc, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from bots.kitobxon.models import User
 from bots.kitobxon.repositories.base import BaseRepository
+
+
+@dataclass
+class ReferralScoreRepairCandidate:
+    user_id: int
+    telegram_id: int
+    fio: str | None
+    old_score: int
+    new_score: int
+    referral_count: int
 
 
 class UserRepository(BaseRepository[User]):
@@ -119,3 +131,54 @@ class UserRepository(BaseRepository[User]):
     async def update_all(self, **values) -> None:
         """Update all users with given values"""
         await self.session.execute(update(User).values(**values))
+
+    async def get_referral_score_repair_candidates(
+        self,
+        *,
+        score_threshold: int = 10,
+        referral_cap: int = 5,
+    ) -> list[ReferralScoreRepairCandidate]:
+        referred = (
+            select(
+                User.referred_by.label("referrer_telegram_id"),
+                func.count(User.id).label("referral_count"),
+            )
+            .where(
+                User.referred_by.is_not(None),
+                User.is_registered.is_(True),
+            )
+            .group_by(User.referred_by)
+            .subquery()
+        )
+
+        target_score = func.least(referred.c.referral_count, referral_cap)
+        stmt = (
+            select(
+                User.id,
+                User.telegram_id,
+                User.fio,
+                User.score,
+                target_score.label("new_score"),
+                referred.c.referral_count,
+            )
+            .join(referred, referred.c.referrer_telegram_id == User.telegram_id)
+            .where(
+                User.is_registered.is_(True),
+                User.score < score_threshold,
+                User.score < target_score,
+            )
+            .order_by(User.id)
+        )
+
+        rows = (await self.session.execute(stmt)).all()
+        return [
+            ReferralScoreRepairCandidate(
+                user_id=row.id,
+                telegram_id=row.telegram_id,
+                fio=row.fio,
+                old_score=row.score,
+                new_score=int(row.new_score),
+                referral_count=int(row.referral_count),
+            )
+            for row in rows
+        ]

@@ -79,6 +79,9 @@ def admin_panel() -> ReplyKeyboardMarkup:
             [
                 KeyboardButton(text="🧹 Hammani testini tozalash"),
             ],
+            [
+                KeyboardButton(text="🎡 Ballarni aylantirish"),
+            ],
         ],
         resize_keyboard=True,
     )
