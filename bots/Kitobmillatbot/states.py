@@ -8,11 +8,6 @@ class AuthStates(StatesGroup):
     awaiting_how_did_find = State()
 
 
-class PendingReferral(StatesGroup):
-    """Stores referrer_id across the subscription gate."""
-    waiting = State()
-
-
 class QuizStates(StatesGroup):
     answering = State()
 

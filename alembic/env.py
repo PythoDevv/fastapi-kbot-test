@@ -8,6 +8,7 @@ from sqlalchemy import pool
 # Load all models so Alembic sees them for autogenerate
 from core.base_model import Base
 import bots.kitobxon.models  # noqa: F401
+import bots.Kitobmillatbot.models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

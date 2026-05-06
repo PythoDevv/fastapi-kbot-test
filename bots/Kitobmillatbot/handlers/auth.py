@@ -4,10 +4,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bots.kitobxon.keyboards import inline, reply
-from bots.kitobxon.repositories import QuizRepository, UserRepository
-from bots.kitobxon.services import AuthService, SubsService
-from bots.kitobxon.states import AuthStates
+from bots.Kitobmillatbot.keyboards import inline, reply
+from bots.Kitobmillatbot.repositories import QuizRepository, UserRepository
+from bots.Kitobmillatbot.services import AuthService, SubsService
+from bots.Kitobmillatbot.states import AuthStates
 from core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -123,26 +123,14 @@ async def _finish_registration(
     bot: Bot,
     phone: str,
 ) -> None:
-    # Read FSM data before clear() destroys pending_referrer_id
-    fsm_data = await state.get_data()
-    pending_referrer_id = fsm_data.get("pending_referrer_id")
-
     auth = AuthService(session)
-    if phone:
-        await auth.set_phone(message.from_user.id, phone)
-
-    # Apply pending referral before mark_registered so award_referral sees referred_by
-    if pending_referrer_id:
-        user = await auth.users.get_by_telegram_id(message.from_user.id)
-        if user and not user.referred_by:
-            await auth.apply_referral(user, pending_referrer_id)
-
+    await auth.set_phone(message.from_user.id, phone)
     await auth.mark_registered(message.from_user.id)
     await state.clear()
 
     subs = SubsService(session)
-    user_result = await auth.touch_user(message.from_user.id, None, None)
-    status = await subs.check_user(bot, message.from_user.id, user_result.user.id)
+    user = await auth.touch_user(message.from_user.id, None, None)
+    status = await subs.check_user(bot, message.from_user.id, user.user.id)
 
     if not status.all_subscribed:
         await message.answer(

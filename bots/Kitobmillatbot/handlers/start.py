@@ -5,11 +5,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bots.kitobxon.keyboards import inline, reply
-from bots.kitobxon.models import User
-from bots.kitobxon.repositories import QuizRepository
-from bots.kitobxon.services import AuthService, SubsService
-from bots.kitobxon.states import AuthStates, PendingReferral
+from bots.Kitobmillatbot.keyboards import inline, reply
+from bots.Kitobmillatbot.models import User
+from bots.Kitobmillatbot.repositories import QuizRepository
+from bots.Kitobmillatbot.services import AuthService, SubsService
+from bots.Kitobmillatbot.states import AuthStates
 from core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -72,14 +72,13 @@ async def cmd_start(
         first_name=message.from_user.first_name,
     )
 
-    # Parse referral — save to FSM data so it survives the subscription gate
+    # Parse referral
     args = message.text.split(maxsplit=1)
-    if len(args) > 1 and not result.user.is_registered and not result.user.referred_by:
+    if len(args) > 1 and not result.user.is_registered:
         try:
             referrer_id = int(args[1])
-            if referrer_id != message.from_user.id:
-                await state.update_data(pending_referrer_id=referrer_id)
-        except ValueError:
+            await auth.apply_referral(result.user, referrer_id)
+        except (ValueError, Exception):
             pass
 
     # Adminlar uchun obuna tekshiruvi yo'q
@@ -94,12 +93,6 @@ async def cmd_start(
                 ),
             )
             return
-
-    # Apply pending referral before continuing
-    fsm_data = await state.get_data()
-    pending_referrer_id = fsm_data.get("pending_referrer_id")
-    if pending_referrer_id and not result.user.referred_by:
-        await auth.apply_referral(result.user, pending_referrer_id)
 
     is_registered = await _continue_after_subscription(
         message,
@@ -145,13 +138,6 @@ async def check_subscription(
 
     if status.all_subscribed:
         await cb.message.delete()
-
-        # Apply pending referral that was stored before the subscription gate
-        fsm_data = await state.get_data()
-        pending_referrer_id = fsm_data.get("pending_referrer_id")
-        if pending_referrer_id and not result.user.referred_by:
-            await auth.apply_referral(result.user, pending_referrer_id)
-
         is_registered = await _continue_after_subscription(
             cb.message,
             state,

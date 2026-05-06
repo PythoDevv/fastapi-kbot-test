@@ -1,7 +1,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
-from bots.kitobxon.models import Channel, Question, ZayafkaChannel
-from bots.kitobxon.services.quiz_service import QuestionPayload
+from bots.Kitobmillatbot.models import Channel, Question, ZayafkaChannel
+from bots.Kitobmillatbot.services.quiz_service import QuestionPayload
 
 
 def subscription_keyboard(
@@ -208,7 +208,7 @@ def referral_score_repair_confirm_keyboard() -> InlineKeyboardMarkup:
 
 def content_list_keyboard(contents: list | None = None) -> InlineKeyboardMarkup:
     """Keyboard with content items to manage — dynamic from DB + add button"""
-    from bots.kitobxon.models import ContentText
+    from bots.Kitobmillatbot.models import ContentText
     buttons = []
     if contents:
         for ct in contents:

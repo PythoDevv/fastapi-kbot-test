@@ -1,0 +1,469 @@
+from dataclasses import dataclass
+from datetime import datetime
+
+from sqlalchemy import bindparam, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from bots.Kitobmillatbot.cache import runtime_cache
+from bots.Kitobmillatbot.config import QuizType
+from bots.Kitobmillatbot.models import ActivityBook, Channel, Question, User, ZayafkaChannel
+from bots.Kitobmillatbot.repositories import (
+    BookRepository,
+    ChannelRepository,
+    ContentRepository,
+    QuizRepository,
+    ScoreLogRepository,
+    UserRepository,
+    ZayafkaRepository,
+)
+
+
+@dataclass
+class AdminStats:
+    total_users: int
+    registered_users: int
+    solved_users: int
+    total_questions: int
+
+
+@dataclass
+class ReferralScoreRepairPreview:
+    candidates: list
+    affected_count: int
+    total_added: int
+
+
+@dataclass
+class ReferralScoreRepairResult:
+    updated_users: list
+    affected_count: int
+    total_added: int
+
+
+class AdminService:
+    MAX_REASONABLE_REFERRAL_COUNT = 1_000_000
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+        self.users = UserRepository(session)
+        self.quiz = QuizRepository(session)
+        self.channels = ChannelRepository(session)
+        self.zayafka = ZayafkaRepository(session)
+        self.contents = ContentRepository(session)
+        self.books = BookRepository(session)
+        self.score_log = ScoreLogRepository(session)
+
+    # --- Stats ---
+    async def get_stats(self) -> AdminStats:
+        return AdminStats(
+            total_users=await self.users.count(),
+            registered_users=await self.users.count_registered(),
+            solved_users=await self.users.count_solved(),
+            total_questions=await self.quiz.count_questions(),
+        )
+
+    async def get_top_promoters(self, limit: int = 30) -> list[User]:
+        """Get top users by referral count"""
+        return await self.users.top_by_referrals(limit)
+
+    async def get_top_test_takers(self, limit: int = 30) -> list[User]:
+        """Get top users by score (who have solved test)"""
+        return await self.users.get_top_by_score_solved(limit)
+
+    # --- Users ---
+    async def find_user(self, telegram_id: int) -> User | None:
+        return await self.users.get_by_telegram_id(telegram_id)
+
+    async def set_score(
+        self,
+        admin_telegram_id: int,
+        admin_fio: str | None,
+        target_telegram_id: int,
+        new_score: int,
+        reason: str | None,
+    ) -> User:
+        user = await self.users.get_by_telegram_id(target_telegram_id)
+        if user is None:
+            from bots.Kitobmillatbot.exceptions import UserNotFoundError
+            raise UserNotFoundError(target_telegram_id)
+        old_score = user.score
+        await self.users.update_fields(target_telegram_id, score=new_score)
+        await self.score_log.log(
+            admin_telegram_id=admin_telegram_id,
+            admin_fio=admin_fio,
+            target_telegram_id=target_telegram_id,
+            target_fio=user.fio,
+            old_score=old_score,
+            new_score=new_score,
+            reason=reason,
+        )
+        user.score = new_score
+        return user
+
+    async def set_referral_count(
+        self,
+        admin_telegram_id: int,
+        admin_fio: str | None,
+        target_telegram_id: int,
+        new_count: int,
+        reason: str | None,
+    ) -> User:
+        if new_count < 0 or new_count > self.MAX_REASONABLE_REFERRAL_COUNT:
+            raise ValueError("Referral count is out of allowed range")
+        user = await self.users.get_by_telegram_id(target_telegram_id)
+        if user is None:
+            from bots.Kitobmillatbot.exceptions import UserNotFoundError
+            raise UserNotFoundError(target_telegram_id)
+        old_count = user.referrals_count
+        await self.users.update_fields(target_telegram_id, referrals_count=new_count)
+        await self.score_log.log(
+            admin_telegram_id=admin_telegram_id,
+            admin_fio=admin_fio,
+            target_telegram_id=target_telegram_id,
+            target_fio=user.fio,
+            old_score=old_count,
+            new_score=new_count,
+            reason=f"Referallar: {reason}" if reason else "Referallar o'zgartirildi",
+        )
+        user.referrals_count = new_count
+        return user
+
+    async def toggle_admin(self, target_telegram_id: int, is_admin: bool) -> None:
+        await self.users.update_fields(target_telegram_id, is_admin=is_admin)
+
+    async def delete_user(self, target_telegram_id: int) -> None:
+        """Delete a user by telegram_id"""
+        await self.users.delete_by_telegram_id(target_telegram_id)
+
+    async def delete_all_users(self) -> None:
+        """Delete all users from database"""
+        await self.users.delete_all()
+
+    async def clear_all_solved(self) -> None:
+        """Clear test_solved status for all users"""
+        await self.users.update_all(test_solved=False)
+
+    async def preview_referral_score_repair(
+        self,
+        *,
+        score_threshold: int = 10,
+        referral_cap: int = 5,
+    ) -> ReferralScoreRepairPreview:
+        candidates = await self.users.get_referral_score_repair_candidates(
+            score_threshold=score_threshold,
+            referral_cap=referral_cap,
+        )
+        total_added = sum(max(item.new_score - item.old_score, 0) for item in candidates)
+        return ReferralScoreRepairPreview(
+            candidates=candidates,
+            affected_count=len(candidates),
+            total_added=total_added,
+        )
+
+    async def apply_referral_score_repair(
+        self,
+        *,
+        admin_telegram_id: int,
+        admin_fio: str | None,
+        score_threshold: int = 10,
+        referral_cap: int = 5,
+    ) -> ReferralScoreRepairResult:
+        preview = await self.preview_referral_score_repair(
+            score_threshold=score_threshold,
+            referral_cap=referral_cap,
+        )
+        candidates = preview.candidates
+        if not candidates:
+            return ReferralScoreRepairResult(
+                updated_users=[],
+                affected_count=0,
+                total_added=0,
+            )
+
+        update_stmt = (
+            update(User.__table__)
+            .where(User.__table__.c.id == bindparam("target_user_id"))
+            .values(score=bindparam("target_new_score"))
+            .execution_options(synchronize_session=False)
+        )
+        params = [
+            {
+                "target_user_id": item.user_id,
+                "target_new_score": item.new_score,
+            }
+            for item in candidates
+        ]
+        await self.session.execute(update_stmt, params)
+
+        for item in candidates:
+            await self.score_log.log(
+                admin_telegram_id=admin_telegram_id,
+                admin_fio=admin_fio,
+                target_telegram_id=item.telegram_id,
+                target_fio=item.fio,
+                old_score=item.old_score,
+                new_score=item.new_score,
+                reason=(
+                    f"Referral repair: {item.referral_count} ta referral asosida "
+                    f"{item.old_score} -> {item.new_score} (cap={referral_cap})"
+                ),
+            )
+
+        await self.session.flush()
+        return ReferralScoreRepairResult(
+            updated_users=candidates,
+            affected_count=preview.affected_count,
+            total_added=preview.total_added,
+        )
+
+    async def import_users(self, users_data: list[dict]) -> tuple[int, int, int]:
+        """Import users from excel data. Returns (updated, created, skipped)"""
+        updated = 0
+        created = 0
+        skipped = 0
+
+        deduplicated: dict[int, dict] = {}
+        for data in users_data:
+            telegram_id = data.get("telegram_id")
+            if not telegram_id:
+                skipped += 1
+                continue
+            deduplicated[telegram_id] = data
+
+        existing_users = await self.users.get_by_telegram_ids(list(deduplicated))
+        new_users: list[User] = []
+
+        for telegram_id, data in deduplicated.items():
+            user = existing_users.get(telegram_id)
+            if user:
+                user.fio = data.get("fio") or user.fio
+                user.username = data.get("username") or user.username
+                user.mobile_number = data.get("mobile_number") or user.mobile_number
+                user.referrals_count = data.get("referrals_count", user.referrals_count)
+                user.score = data.get("score", user.score)
+                user.referred_by = data.get("referred_by") or user.referred_by
+                user.is_registered = True
+                updated += 1
+                continue
+
+            new_users.append(
+                User(
+                    telegram_id=telegram_id,
+                    fio=data.get("fio"),
+                    username=data.get("username"),
+                    mobile_number=data.get("mobile_number"),
+                    referrals_count=data.get("referrals_count", 0),
+                    score=data.get("score", 0),
+                    referred_by=data.get("referred_by"),
+                    is_registered=True,
+                )
+            )
+            created += 1
+
+        if new_users:
+            self.session.add_all(new_users)
+
+        await self.session.commit()
+        return updated, created, skipped
+
+    async def reset_test(self, target_telegram_id: int) -> None:
+        user = await self.users.get_by_telegram_id(target_telegram_id)
+        if user is None:
+            from bots.Kitobmillatbot.exceptions import UserNotFoundError
+            raise UserNotFoundError(target_telegram_id)
+
+        session_score_total = await self.quiz.sum_session_scores(user.id)
+        await self.quiz.delete_sessions_for_user(user.id)
+        new_score = max((user.score or 0) - session_score_total, 0)
+        await self.users.update_fields(
+            target_telegram_id,
+            test_solved=False,
+            score=new_score,
+            certificate_received=False,
+        )
+
+    # --- Channels ---
+    async def add_channel(
+        self,
+        channel_id: int,
+        name: str,
+        link: str | None,
+        traverse_text: str | None,
+    ) -> Channel:
+        ch = Channel(
+            channel_id=channel_id,
+            channel_name=name,
+            channel_link=link,
+            traverse_text=traverse_text,
+            active=True,
+        )
+        self.session.add(ch)
+        await self.session.flush()
+        runtime_cache.invalidate_active_channels()
+        return ch
+
+    async def toggle_channel(self, channel_db_id: int, active: bool) -> None:
+        ch = await self.channels.get(channel_db_id)
+        if ch:
+            ch.active = active
+            await self.session.flush()
+            runtime_cache.invalidate_active_channels()
+
+    async def delete_channel(self, channel_db_id: int) -> None:
+        ch = await self.channels.get(channel_db_id)
+        if ch:
+            await self.channels.delete(ch)
+            runtime_cache.invalidate_active_channels()
+
+    async def list_channels(self) -> list[Channel]:
+        return await self.channels.list_all()
+
+    # --- Zayafka channels ---
+    async def add_zayafka_channel(
+        self, channel_id: int, name: str, link: str | None, sequence: int = 0
+    ) -> ZayafkaChannel:
+        zch = ZayafkaChannel(
+            channel_id=channel_id,
+            name=name,
+            link=link,
+            sequence=sequence,
+        )
+        self.session.add(zch)
+        await self.session.flush()
+        runtime_cache.invalidate_zayafka_channels()
+        return zch
+
+    async def delete_zayafka_channel(self, db_id: int) -> None:
+        zch = await self.zayafka.get(db_id)
+        if zch:
+            await self.zayafka.delete(zch)
+            runtime_cache.invalidate_zayafka_channels()
+
+    async def list_zayafka_channels(self) -> list[ZayafkaChannel]:
+        return await self.zayafka.list_ordered()
+
+    # --- Questions ---
+    async def add_question(
+        self,
+        text: str,
+        correct: str,
+        wrong_1: str,
+        wrong_2: str,
+        wrong_3: str,
+    ) -> Question:
+        q = Question(
+            text=text,
+            correct_answer=correct,
+            answer_2=wrong_1,
+            answer_3=wrong_2,
+            answer_4=wrong_3,
+        )
+        self.session.add(q)
+        await self.session.flush()
+        runtime_cache.invalidate_question_ids()
+        return q
+
+    async def delete_question(self, question_id: int) -> None:
+        q = await self.quiz.get(question_id)
+        if q:
+            await self.quiz.delete(q)
+            runtime_cache.invalidate_question_ids()
+
+    async def list_questions(self) -> list[Question]:
+        return await self.quiz.list()
+
+    # --- Quiz settings ---
+    async def set_quiz_waiting(self, waiting: bool) -> None:
+        s = await self.quiz.ensure_settings()
+        s.waiting = waiting
+        await self.session.flush()
+
+    async def set_quiz_finished(self, finished: bool) -> None:
+        s = await self.quiz.ensure_settings()
+        s.finished = finished
+        await self.session.flush()
+
+    async def set_quiz_type(self, quiz_type: QuizType) -> None:
+        s = await self.quiz.ensure_settings()
+        s.quiz_type = quiz_type
+        await self.session.flush()
+
+    async def set_waiting_post(
+        self,
+        *,
+        text: str | None,
+        image_id: str | None,
+    ) -> None:
+        s = await self.quiz.ensure_settings()
+        s.waiting_text = text
+        s.image_id = image_id
+
+    async def clear_waiting_post(self) -> None:
+        s = await self.quiz.ensure_settings()
+        s.waiting_text = None
+        s.image_id = None
+
+    async def toggle_require_phone(self) -> None:
+        s = await self.quiz.ensure_settings()
+        s.require_phone_number = not s.require_phone_number
+        await self.session.flush()
+
+    async def get_settings(self):
+        return await self.quiz.ensure_settings()
+
+    # --- Dedicated content buttons ---
+    async def save_content_post(
+        self,
+        *,
+        key: str,
+        text: str | None,
+        image_id: str | None,
+        require_link: bool = False,
+        append: bool = False,
+    ) -> None:
+        if append:
+            await self.contents.create(
+                key=f"{key}:{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}",
+                text=text,
+                image_id=image_id,
+                require_link=require_link,
+            )
+            return
+        await self.contents.replace(
+            key=key,
+            text=text,
+            image_id=image_id,
+            require_link=require_link,
+        )
+
+    async def clear_content_post(self, key: str) -> None:
+        if key == "referral":
+            await self.contents.delete_by_key_group(key)
+            return
+        await self.contents.clear(key)
+
+    async def delete_content_post(self, key: str) -> bool:
+        if key == "referral":
+            return await self.contents.delete_latest_by_key_group(key)
+        return await self.contents.delete_by_key(key)
+
+    async def add_book(
+        self,
+        *,
+        title: str,
+        button_text: str,
+        button_url: str,
+    ) -> ActivityBook:
+        return await self.books.create(
+            title=title,
+            button_text=button_text,
+            button_url=button_url,
+        )
+
+    async def list_books(self) -> list[ActivityBook]:
+        return await self.books.list_all()
+
+    async def delete_book(self, book_id: int) -> None:
+        book = await self.books.get(book_id)
+        if book:
+            await self.books.delete(book)
