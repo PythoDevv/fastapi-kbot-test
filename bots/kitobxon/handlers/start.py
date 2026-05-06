@@ -78,12 +78,14 @@ async def cmd_start(
 
     referral_result = await auth.award_referral_bonus_if_eligible(message.from_user.id)
     if referral_result:
-        referrer_id, referrer_referrals = referral_result
+        referrer_id, referrer_score, confirmed_referrals = referral_result
         await bot.send_message(
             referrer_id,
             f"{result.user.fio or result.user.username or message.from_user.first_name} "
             "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
-            f"Sizdagi referallar soni: <b>{referrer_referrals}</b>",
+            "Sizga <b>+1 ball</b> qo'shildi.\n"
+            f"Joriy ballingiz: <b>{referrer_score}</b>\n"
+            f"Tasdiqlangan referallar soni: <b>{confirmed_referrals}</b>",
         )
     await _continue_after_subscription(
         message,
@@ -110,12 +112,14 @@ async def check_subscription(
         await cb.message.delete()
         referral_result = await auth.award_referral_bonus_if_eligible(cb.from_user.id)
         if referral_result:
-            referrer_id, referrer_referrals = referral_result
+            referrer_id, referrer_score, confirmed_referrals = referral_result
             await bot.send_message(
                 referrer_id,
                 f"{result.user.fio or result.user.username or cb.from_user.first_name} "
                 "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
-                f"Sizdagi referallar soni: <b>{referrer_referrals}</b>",
+                "Sizga <b>+1 ball</b> qo'shildi.\n"
+                f"Joriy ballingiz: <b>{referrer_score}</b>\n"
+                f"Tasdiqlangan referallar soni: <b>{confirmed_referrals}</b>",
             )
         await _continue_after_subscription(
             cb.message,
