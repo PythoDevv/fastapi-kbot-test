@@ -58,8 +58,11 @@ async def drop_all_users(message: Message, session: AsyncSession) -> None:
     if message.from_user.id != 935795577:
         await message.answer("Sizda bu komandani ishga tushirish huquqi yo'q.")
         return
-    await AdminService(session).delete_all_users()
-    await message.answer("Barcha foydalanuvchilar o'chirildi.")
+    await message.answer(
+        "Bu komanda live bot ichida o'chirib qo'yilgan.\n\n"
+        "Sabab: webhook ishlayotgan paytda `DELETE FROM kitobxon_users` deadlock berishi mumkin.\n"
+        "Agar hamma userni tozalash kerak bo'lsa, avval botni to'xtatib keyin DB'dan alohida bajaring."
+    )
 
 
 @router.message(F.text == "🧹 Hammani testini tozalash")

@@ -40,6 +40,13 @@ class UserRepository(BaseRepository[User]):
             update(User).where(User.id == user_id).values(score=User.score + delta)
         )
 
+    async def increment_referrals(self, user_id: int, delta: int = 1) -> None:
+        await self.session.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(referrals_count=User.referrals_count + delta)
+        )
+
     async def top_by_score(self, limit: int = 10) -> list[User]:
         stmt = (
             select(User)
@@ -82,13 +89,6 @@ class UserRepository(BaseRepository[User]):
             for user in users:
                 users_by_tid[user.telegram_id] = user
         return users_by_tid
-
-    async def count_awarded_referrals(self, referrer_telegram_id: int) -> int:
-        stmt = select(func.count()).select_from(User).where(
-            User.referred_by == referrer_telegram_id,
-            User.referral_bonus_awarded.is_(True),
-        )
-        return int((await self.session.execute(stmt)).scalar_one())
 
     async def count_registered(self) -> int:
         return await self.count(is_registered=True)

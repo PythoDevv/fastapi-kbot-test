@@ -71,7 +71,7 @@ class AuthService:
     async def award_referral_bonus_if_eligible(
         self, telegram_id: int
     ) -> tuple[int, int] | None:
-        """Award referral bonus exactly once and sync referral count.
+        """Award referral bonus exactly once and increment referral count.
 
         Returns (referrer_telegram_id, referrer_referrals_count) when awarded,
         otherwise None.
@@ -85,12 +85,9 @@ class AuthService:
             return None
 
         await self.users.increment_score(referrer.id, 1)
+        await self.users.increment_referrals(referrer.id, 1)
         await self.users.update_fields(telegram_id, referral_bonus_awarded=True)
         await self.session.flush()
-        awarded_referrals = await self.users.count_awarded_referrals(referrer.telegram_id)
-        await self.users.update_fields(
-            referrer.telegram_id,
-            referrals_count=awarded_referrals,
-        )
-        await self.session.flush()
-        return referrer.telegram_id, awarded_referrals
+        updated_referrer = await self.users.get_by_telegram_id(referrer.telegram_id)
+        assert updated_referrer is not None
+        return referrer.telegram_id, updated_referrer.referrals_count
