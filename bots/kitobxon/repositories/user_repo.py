@@ -1,4 +1,4 @@
-from sqlalchemy import delete, desc, select, update
+from sqlalchemy import delete, desc, func, select, update
 
 from bots.kitobxon.models import User
 from bots.kitobxon.repositories.base import BaseRepository
@@ -71,6 +71,13 @@ class UserRepository(BaseRepository[User]):
             .order_by(User.id)
         )
         return list((await self.session.execute(stmt)).scalars().all())
+
+    async def count_confirmed_referrals(self, referrer_telegram_id: int) -> int:
+        stmt = select(func.count()).select_from(User).where(
+            User.referred_by == referrer_telegram_id,
+            User.referral_bonus_awarded.is_(True),
+        )
+        return int((await self.session.execute(stmt)).scalar_one())
 
     async def count_registered(self) -> int:
         return await self.count(is_registered=True)

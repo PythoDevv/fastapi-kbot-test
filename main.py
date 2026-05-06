@@ -8,6 +8,7 @@ from bots.kitobxon.webapp.router import router as webapp_router
 from core.admin_init import initialize_admins
 from core.config import settings
 from core.database import AsyncSessionLocal, dispose_engine
+from core.http_security import block_scanner_probes
 from core.logging import get_logger, setup_logging
 from core.registry import BotConfig, BotRegistry
 
@@ -67,7 +68,13 @@ app = FastAPI(
     redoc_url=None,
 )
 
+app.middleware("http")(block_scanner_probes)
 app.include_router(webapp_router)
+
+
+@app.get("/", include_in_schema=False)
+async def root() -> dict[str, str]:
+    return {"status": "ok"}
 
 
 @app.get("/health", tags=["system"])

@@ -44,6 +44,8 @@ sudo systemctl status kbot
 sudo journalctl -u kbot -f
 ```
 
+Eslatma: webhook rejimida `aiogram` FSM `MemoryStorage` bilan ishlayotgani uchun servis `1 worker` bilan ko'tarilishi kerak. Aks holda `Userlarni import`, kanal qo'shish, savol qo'shish kabi state'li oqimlar workerlar orasida yo'qolib qolishi mumkin.
+
 ### Polling fallback (konkurs paytida webhook qotganda)
 
 ```bash

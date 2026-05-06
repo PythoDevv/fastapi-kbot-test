@@ -24,6 +24,7 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 router = Router(name="quiz")
+MIN_CONFIRMED_REFERRALS_TO_START = 5
 
 # Timeout task registry for WEB mode questions
 _timeout_tasks: dict[int, asyncio.Task] = {}
@@ -253,6 +254,17 @@ async def start_quiz(
     user = await user_repo.get_by_telegram_id(message.from_user.id)
     if not user or not user.is_registered:
         await message.answer("Avval ro'yxatdan o'ting.")
+        return
+
+    confirmed_referrals = await user_repo.count_confirmed_referrals(message.from_user.id)
+    if confirmed_referrals < MIN_CONFIRMED_REFERRALS_TO_START:
+        remaining = MIN_CONFIRMED_REFERRALS_TO_START - confirmed_referrals
+        await message.answer(
+            "Testni ishlash uchun kamida "
+            f"<b>{MIN_CONFIRMED_REFERRALS_TO_START} ta</b> referral orqali odam taklif qilishingiz kerak.\n\n"
+            f"Hozir tasdiqlangan referral: <b>{confirmed_referrals}</b>\n"
+            f"Yana kerak: <b>{remaining}</b>",
+        )
         return
 
     # Subscription check
