@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     KITOBXON_ADMIN_IDS: list[int] = Field(default_factory=lambda: [935795577])
     KITOBXON_WEBHOOK_PATH: str = "/kitobxon/webhook"
     WEBAPP_JWT_SECRET: str = "change-me-webapp-jwt-secret-32chars"
+    WEBAPP_JWT_TTL_SECONDS: int = 60 * 60 * 5
 
     LOG_LEVEL: str = "INFO"
 

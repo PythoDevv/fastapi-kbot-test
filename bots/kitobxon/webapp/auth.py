@@ -7,8 +7,10 @@ from urllib.parse import parse_qsl
 import jwt
 from fastapi import HTTPException
 
+from core.config import settings
+
 _ALGORITHM = "HS256"
-_TTL = 900  # 15 min
+_TTL = settings.WEBAPP_JWT_TTL_SECONDS
 
 
 def _verify_init_data(init_data: str, bot_token: str) -> dict:
