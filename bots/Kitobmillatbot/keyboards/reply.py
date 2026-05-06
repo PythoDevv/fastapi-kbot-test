@@ -16,7 +16,7 @@ def main_menu() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="Tanlov kitoblari 📚"),
             ],
             [
-                KeyboardButton(text="🎖 Mening sertifikatim"),
+                # KeyboardButton(text="🎖 Mening sertifikatim"),
                 KeyboardButton(text="Viktorina sovg'alari 🎁"),
             ],
             [KeyboardButton(text="Ismni o'zgartirish ✏️")],
