@@ -49,11 +49,6 @@ async def back_to_menu(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
     await state.clear()
-    user_repo = UserRepository(session)
-    user = await user_repo.get_by_telegram_id(message.from_user.id)
-    if user and user.is_admin:
-        await message.answer("Admin panel:", reply_markup=reply.admin_panel())
-        return
     await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
 
 

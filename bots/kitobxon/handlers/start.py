@@ -24,13 +24,7 @@ async def _continue_after_subscription(
     message: Message,
     state: FSMContext,
     is_registered: bool,
-    is_admin: bool,
 ) -> None:
-    if is_admin:
-        await state.clear()
-        await message.answer("Admin panel:", reply_markup=reply.admin_panel())
-        return
-
     if is_registered:
         await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
         return
@@ -64,17 +58,18 @@ async def cmd_start(
         except (ValueError, Exception):
             pass
 
-    # Check subscription first (for both new and registered users)
-    subs = SubsService(session)
-    status = await subs.check_user(bot, message.from_user.id, result.user.id)
-    if not status.all_subscribed:
-        await message.answer(
-            _subscription_prompt_text(False),
-            reply_markup=inline.subscription_keyboard(
-                status.missing_channels, status.missing_zayafka
-            ),
-        )
-        return
+    # Adminlar uchun obuna tekshiruvi yo'q
+    if not result.user.is_admin:
+        subs = SubsService(session)
+        status = await subs.check_user(bot, message.from_user.id, result.user.id)
+        if not status.all_subscribed:
+            await message.answer(
+                _subscription_prompt_text(False),
+                reply_markup=inline.subscription_keyboard(
+                    status.missing_channels, status.missing_zayafka
+                ),
+            )
+            return
 
     referral_result = await auth.award_referral_bonus_if_eligible(message.from_user.id)
     if referral_result:
@@ -91,7 +86,6 @@ async def cmd_start(
         message,
         state,
         result.user.is_registered,
-        result.user.is_admin,
     )
 
 
@@ -105,6 +99,16 @@ async def check_subscription(
         username=cb.from_user.username,
         first_name=cb.from_user.first_name,
     )
+    if result.user.is_admin:
+        await cb.message.delete()
+        await _continue_after_subscription(
+            cb.message,
+            state,
+            result.user.is_registered,
+        )
+        await cb.answer()
+        return
+
     subs = SubsService(session)
     status = await subs.check_user(bot, cb.from_user.id, result.user.id)
 
@@ -125,7 +129,6 @@ async def check_subscription(
             cb.message,
             state,
             result.user.is_registered,
-            result.user.is_admin,
         )
     else:
         text = _subscription_prompt_text(True)

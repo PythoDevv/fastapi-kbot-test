@@ -267,17 +267,18 @@ async def start_quiz(
         )
         return
 
-    # Subscription check
-    subs = SubsService(session)
-    status = await subs.check_user(bot, message.from_user.id, user.id)
-    if not status.all_subscribed:
-        await message.answer(
-            "Testni boshlash uchun avval kanallarga obuna bo'ling:",
-            reply_markup=inline.subscription_keyboard(
-                status.missing_channels, status.missing_zayafka
-            ),
-        )
-        return
+    # Adminlar uchun obuna tekshiruvi yo'q
+    if not user.is_admin:
+        subs = SubsService(session)
+        status = await subs.check_user(bot, message.from_user.id, user.id)
+        if not status.all_subscribed:
+            await message.answer(
+                "Testni boshlash uchun avval kanallarga obuna bo'ling:",
+                reply_markup=inline.subscription_keyboard(
+                    status.missing_channels, status.missing_zayafka
+                ),
+            )
+            return
 
     service = QuizService(session)
     result = None
