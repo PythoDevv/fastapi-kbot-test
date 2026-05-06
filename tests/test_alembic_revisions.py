@@ -62,6 +62,14 @@ class AlembicRevisionTests(unittest.TestCase):
         revision = self.revisions["c7f8a9b0d1e2"]
         self.assertEqual(revision.down_revision, "b7c9d1e2f3a4")
 
+    def test_kitobmillatbot_schema_migration_exists(self) -> None:
+        revision = self.revisions.get("d6f9a8c4b2e1")
+        self.assertIsNotNone(
+            revision,
+            "Missing migration for kitobmillatbot schema creation",
+        )
+        self.assertEqual(revision.down_revision, "c7f8a9b0d1e2")
+
 
 if __name__ == "__main__":
     unittest.main()

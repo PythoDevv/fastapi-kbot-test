@@ -12,6 +12,7 @@ logger = get_logger(__name__)
 
 BASE_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "static")
 CERT_TEMPLATE = os.path.join(BASE_DIR, "certificates", "template.png")
+ALT_CERT_TEMPLATE = os.path.join(os.path.dirname(__file__), "..", "certificate.png")
 FONT_DIR = os.path.join(BASE_DIR, "fonts")
 
 
@@ -61,13 +62,18 @@ def generate_certificate(
         logger.error("Pillow not installed")
         return None
 
-    if not os.path.exists(CERT_TEMPLATE):
-        logger.warning("Certificate template not found: %s", CERT_TEMPLATE)
-        return None
+    template_path = CERT_TEMPLATE
+    if not os.path.exists(template_path):
+        if os.path.exists(ALT_CERT_TEMPLATE):
+            template_path = ALT_CERT_TEMPLATE
+            logger.warning("Certificate template missing in static path, using fallback: %s", template_path)
+        else:
+            logger.warning("Certificate template not found: %s", CERT_TEMPLATE)
+            return None
 
     font_path = os.path.join(FONT_DIR, font_name)
     try:
-        img = Image.open(CERT_TEMPLATE).convert("RGBA")
+        img = Image.open(template_path).convert("RGBA")
         draw = ImageDraw.Draw(img, "RGBA")
 
         img_w, img_h = img.size
