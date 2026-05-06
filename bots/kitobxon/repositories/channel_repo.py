@@ -1,3 +1,4 @@
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import select
 
 from bots.kitobxon.cache import (
@@ -87,17 +88,19 @@ class ZayafkaRepository(BaseRepository[ZayafkaChannel]):
         return set(rows)
 
     async def mark_requested(self, user_id: int, zayafka_channel_id: int) -> None:
-        stmt = select(UserZayafkaChannel).where(
-            UserZayafkaChannel.user_id == user_id,
-            UserZayafkaChannel.zayafka_channel_id == zayafka_channel_id,
-        )
-        existing = (await self.session.execute(stmt)).scalar_one_or_none()
-        if not existing:
-            self.session.add(
-                UserZayafkaChannel(
-                    user_id=user_id,
-                    zayafka_channel_id=zayafka_channel_id,
-                    approved=False,
-                )
+        stmt = (
+            insert(UserZayafkaChannel)
+            .values(
+                user_id=user_id,
+                zayafka_channel_id=zayafka_channel_id,
+                approved=False,
             )
+            .on_conflict_do_nothing(
+                index_elements=[
+                    UserZayafkaChannel.user_id,
+                    UserZayafkaChannel.zayafka_channel_id,
+                ]
+            )
+        )
+        await self.session.execute(stmt)
         await self.session.flush()
