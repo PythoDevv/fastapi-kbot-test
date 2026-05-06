@@ -57,6 +57,7 @@ class User(Base, TimestampMixin):
     how_did_find: Mapped[str | None] = mapped_column(String(255))
 
     test_sessions: Mapped[list["TestSession"]] = relationship(
+        "bots.Kitobmillatbot.models.TestSession",
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -182,8 +183,12 @@ class TestSession(Base, TimestampMixin):
     score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_questions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    user: Mapped["User"] = relationship(back_populates="test_sessions")
+    user: Mapped["User"] = relationship(
+        "bots.Kitobmillatbot.models.User",
+        back_populates="test_sessions",
+    )
     answers: Mapped[list["TestAnswer"]] = relationship(
+        "bots.Kitobmillatbot.models.TestAnswer",
         back_populates="session", cascade="all, delete-orphan"
     )
 
@@ -214,7 +219,10 @@ class TestAnswer(Base, TimestampMixin):
         Integer, default=0, nullable=False
     )
 
-    session: Mapped["TestSession"] = relationship(back_populates="answers")
+    session: Mapped["TestSession"] = relationship(
+        "bots.Kitobmillatbot.models.TestSession",
+        back_populates="answers",
+    )
 
 
 class PollMap(Base, TimestampMixin):
