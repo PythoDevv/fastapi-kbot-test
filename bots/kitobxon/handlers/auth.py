@@ -95,7 +95,15 @@ async def _finish_registration(
         )
         return
 
-    await auth.award_referral_bonus_if_eligible(message.from_user.id)
+    referral_result = await auth.award_referral_bonus_if_eligible(message.from_user.id)
+    if referral_result:
+        referrer_id, referrer_referrals = referral_result
+        await bot.send_message(
+            referrer_id,
+            f"{message.from_user.full_name or message.from_user.first_name or message.from_user.username} "
+            "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
+            f"Sizdagi referallar soni: <b>{referrer_referrals}</b>",
+        )
     await message.answer("Tabriklaymiz! Ro'yxatdan o'tdingiz.", reply_markup=reply.main_menu())
 
 

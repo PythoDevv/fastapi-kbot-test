@@ -2,8 +2,9 @@ import json
 import random
 from datetime import datetime
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import case, delete, func, select, update
 
+from bots.kitobxon.cache import runtime_cache
 from bots.kitobxon.config import QuizType
 from bots.kitobxon.models import (
     PollMap,
@@ -11,6 +12,7 @@ from bots.kitobxon.models import (
     QuizSettings,
     TestAnswer,
     TestSession,
+    User,
 )
 from bots.kitobxon.repositories.base import BaseRepository
 
@@ -87,13 +89,7 @@ class QuizRepository(BaseRepository[Question]):
         if count <= 0:
             return []
 
-        question_ids = list(
-            (
-                await self.session.execute(
-                    select(Question.id).order_by(Question.id)
-                )
-            ).scalars().all()
-        )
+        question_ids = await self.get_all_question_ids()
         if not question_ids:
             return []
 
@@ -113,7 +109,23 @@ class QuizRepository(BaseRepository[Question]):
         return rows
 
     async def count_questions(self) -> int:
-        return await self.count()
+        question_ids = await self.get_all_question_ids()
+        return len(question_ids)
+
+    async def get_all_question_ids(self) -> list[int]:
+        cached = runtime_cache.get_question_ids()
+        if cached is not None:
+            return cached
+
+        question_ids = list(
+            (
+                await self.session.execute(
+                    select(Question.id).order_by(Question.id)
+                )
+            ).scalars().all()
+        )
+        runtime_cache.set_question_ids(question_ids)
+        return question_ids
 
     # --- Test sessions ---
     async def get_active_session(self, user_id: int) -> TestSession | None:
@@ -232,6 +244,60 @@ class QuizRepository(BaseRepository[Question]):
             .limit(1)
         )
         return (await self.session.execute(stmt)).scalar_one_or_none()
+
+    async def get_latest_completed_sessions_summary(self) -> list[dict]:
+        latest_sessions = (
+            select(
+                TestSession.user_id.label("user_id"),
+                func.max(TestSession.id).label("session_id"),
+            )
+            .where(TestSession.is_completed.is_(True))
+            .group_by(TestSession.user_id)
+            .subquery()
+        )
+
+        stmt = (
+            select(
+                User.telegram_id.label("telegram_id"),
+                User.fio.label("fio"),
+                User.username.label("username"),
+                TestSession.id.label("session_id"),
+                TestSession.score.label("score"),
+                TestSession.total_questions.label("total_questions"),
+                TestSession.completed_at.label("completed_at"),
+                func.coalesce(func.sum(TestAnswer.time_taken_seconds), 0).label(
+                    "total_time_seconds"
+                ),
+                func.coalesce(
+                    func.sum(case((TestAnswer.is_correct.is_(True), 1), else_=0)),
+                    0,
+                ).label("correct_count"),
+                func.coalesce(
+                    func.sum(case((TestAnswer.is_correct.is_(False), 1), else_=0)),
+                    0,
+                ).label("incorrect_count"),
+                func.coalesce(
+                    func.sum(case((TestAnswer.is_timeout.is_(True), 1), else_=0)),
+                    0,
+                ).label("timeout_count"),
+            )
+            .join(latest_sessions, latest_sessions.c.session_id == TestSession.id)
+            .join(User, User.id == TestSession.user_id)
+            .outerjoin(TestAnswer, TestAnswer.session_id == TestSession.id)
+            .group_by(
+                User.telegram_id,
+                User.fio,
+                User.username,
+                TestSession.id,
+                TestSession.score,
+                TestSession.total_questions,
+                TestSession.completed_at,
+            )
+            .order_by(TestSession.completed_at.desc(), TestSession.id.desc())
+        )
+
+        rows = (await self.session.execute(stmt)).mappings().all()
+        return [dict(row) for row in rows]
 
     async def get_session_answers(self, session_id: int) -> list[TestAnswer]:
         stmt = (

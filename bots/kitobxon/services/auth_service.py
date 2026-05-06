@@ -69,16 +69,23 @@ class AuthService:
         await self.session.flush()
         return True
 
-    async def award_referral_bonus_if_eligible(self, telegram_id: int) -> bool:
-        """Award 1 score point to the referrer exactly once."""
+    async def award_referral_bonus_if_eligible(
+        self, telegram_id: int
+    ) -> tuple[int, int] | None:
+        """Award 1 score point to the referrer exactly once.
+
+        Returns (referrer_telegram_id, referrer_referrals_count) when awarded,
+        otherwise None.
+        """
         user = await self.users.get_by_telegram_id(telegram_id)
         if not user or not user.referred_by or user.referral_bonus_awarded:
-            return False
+            return None
 
         referrer = await self.users.get_by_telegram_id(user.referred_by)
         if not referrer:
-            return False
+            return None
 
         await self.users.increment_score(referrer.id, 1)
         await self.users.update_fields(telegram_id, referral_bonus_awarded=True)
-        return True
+        await self.session.flush()
+        return referrer.telegram_id, referrer.referrals_count

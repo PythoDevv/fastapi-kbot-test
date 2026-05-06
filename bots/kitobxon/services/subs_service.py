@@ -4,7 +4,11 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bots.kitobxon.models import Channel, ZayafkaChannel
+from bots.kitobxon.cache import (
+    ChannelSnapshot,
+    ZayafkaChannelSnapshot,
+    runtime_cache,
+)
 from bots.kitobxon.repositories import ChannelRepository, ZayafkaRepository
 from core.logging import get_logger
 
@@ -14,8 +18,8 @@ logger = get_logger(__name__)
 @dataclass
 class SubscriptionStatus:
     all_subscribed: bool
-    missing_channels: list[Channel]
-    missing_zayafka: list[ZayafkaChannel]
+    missing_channels: list[ChannelSnapshot]
+    missing_zayafka: list[ZayafkaChannelSnapshot]
 
 
 class SubsService:
@@ -27,16 +31,16 @@ class SubsService:
     async def check_user(
         self, bot: Bot, telegram_id: int, user_db_id: int
     ) -> SubscriptionStatus:
-        missing: list[Channel] = []
-        for ch in await self.channels.list_active():
+        missing: list[ChannelSnapshot] = []
+        for ch in await self.channels.list_active_cached():
             if ch.skip_check:
                 continue
             if not await self._is_member(bot, ch.channel_id, telegram_id):
                 missing.append(ch)
 
         requested_or_approved = await self.zayafka.get_user_recorded_ids(user_db_id)
-        missing_zayafka: list[ZayafkaChannel] = []
-        for zch in await self.zayafka.list_ordered():
+        missing_zayafka: list[ZayafkaChannelSnapshot] = []
+        for zch in await self.zayafka.list_ordered_cached():
             if zch.id not in requested_or_approved:
                 if not await self._is_member(bot, zch.channel_id, telegram_id):
                     missing_zayafka.append(zch)
@@ -50,11 +54,19 @@ class SubsService:
     async def _is_member(
         self, bot: Bot, channel_id: int, telegram_id: int
     ) -> bool:
+        if runtime_cache.has_recent_member(channel_id, telegram_id):
+            return True
+
         try:
             member = await bot.get_chat_member(
                 chat_id=channel_id, user_id=telegram_id
             )
-            return member.status in ("member", "creator", "administrator")
+            is_member = member.status in ("member", "creator", "administrator")
+            if is_member:
+                runtime_cache.remember_member(channel_id, telegram_id)
+            else:
+                runtime_cache.forget_member(channel_id, telegram_id)
+            return is_member
         except TelegramAPIError as exc:
             logger.warning(
                 "Failed to check membership chat=%s user=%s: %s",
@@ -67,7 +79,7 @@ class SubsService:
     async def mark_zayafka_requested(
         self, user_db_id: int, zayafka_channel_telegram_id: int
     ) -> None:
-        zlist = await self.zayafka.list_ordered()
+        zlist = await self.zayafka.list_ordered_cached()
         match = next(
             (z for z in zlist if z.channel_id == zayafka_channel_telegram_id),
             None,

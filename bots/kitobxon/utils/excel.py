@@ -139,6 +139,77 @@ def export_answers_to_excel(user, session, answers: list) -> io.BytesIO:
     return buf
 
 
+def export_test_results_summary_to_excel(rows: list[dict[str, Any]]) -> io.BytesIO:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Test statistikasi"
+
+    headers = [
+        "№",
+        "Telegram ID",
+        "FIO",
+        "Username",
+        "Session ID",
+        "Ball",
+        "Jami savol",
+        "To'g'ri",
+        "Noto'g'ri",
+        "Timeout",
+        "Jami vaqt (s)",
+        "Jami vaqt",
+        "Yakunlangan vaqti",
+    ]
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(fill_type="solid", fgColor="2E4057")
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    ws.row_dimensions[1].height = 30
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+
+    for row_idx, row in enumerate(rows, 2):
+        total_time_seconds = int(row.get("total_time_seconds") or 0)
+        hours = total_time_seconds // 3600
+        minutes = (total_time_seconds % 3600) // 60
+        seconds = total_time_seconds % 60
+        time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+        ws.cell(row=row_idx, column=1, value=row_idx - 1)
+        ws.cell(row=row_idx, column=2, value=row.get("telegram_id"))
+        ws.cell(row=row_idx, column=3, value=row.get("fio") or "")
+        ws.cell(
+            row=row_idx,
+            column=4,
+            value=f"@{row['username']}" if row.get("username") else "",
+        )
+        ws.cell(row=row_idx, column=5, value=row.get("session_id"))
+        ws.cell(row=row_idx, column=6, value=row.get("score") or 0)
+        ws.cell(row=row_idx, column=7, value=row.get("total_questions") or 0)
+        ws.cell(row=row_idx, column=8, value=row.get("correct_count") or 0)
+        ws.cell(row=row_idx, column=9, value=row.get("incorrect_count") or 0)
+        ws.cell(row=row_idx, column=10, value=row.get("timeout_count") or 0)
+        ws.cell(row=row_idx, column=11, value=total_time_seconds)
+        ws.cell(row=row_idx, column=12, value=time_str)
+        completed_at = row.get("completed_at")
+        ws.cell(
+            row=row_idx,
+            column=13,
+            value=completed_at.strftime("%Y-%m-%d %H:%M:%S") if completed_at else "",
+        )
+
+    col_widths = [5, 16, 30, 20, 12, 8, 10, 8, 10, 10, 14, 12, 20]
+    for col_idx, width in enumerate(col_widths, 1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
 def generate_questions_template() -> tuple[io.BytesIO, str]:
     """Generate template file for questions import (.xlsx with example row)"""
     wb = openpyxl.Workbook()

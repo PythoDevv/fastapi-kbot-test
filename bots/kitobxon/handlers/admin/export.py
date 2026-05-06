@@ -16,6 +16,7 @@ from bots.kitobxon.states import AdminExportStates, AdminImportStates
 from bots.kitobxon.utils.excel import (
     export_answers_to_excel,
     export_referred_users_to_excel,
+    export_test_results_summary_to_excel,
     export_users_to_excel,
     import_users_from_excel,
 )
@@ -139,6 +140,26 @@ async def export_user_answers(
         document=BufferedInputFile(buf.read(), filename=f"javoblar_{telegram_id}.xlsx"),
         caption=f"{user.fio or telegram_id} javoblari eksport qilindi.",
         reply_markup=reply.admin_panel(),
+    )
+
+
+@router.message(F.text == "📊 Test hisobot")
+async def export_test_results_summary(
+    message: Message, session: AsyncSession
+) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+
+    quiz_repo = QuizRepository(session)
+    rows = await quiz_repo.get_latest_completed_sessions_summary()
+    if not rows:
+        await message.answer("Yakunlangan testlar topilmadi.")
+        return
+
+    buf = export_test_results_summary_to_excel(rows)
+    await message.answer_document(
+        document=BufferedInputFile(buf.read(), filename="test_statistikasi.xlsx"),
+        caption=f"Jami: {len(rows)} ta yakunlangan test statistikasi",
     )
 
 

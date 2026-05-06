@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bots.kitobxon.cache import runtime_cache
 from bots.kitobxon.config import QuizType
 from bots.kitobxon.models import ActivityBook, Channel, Question, User, ZayafkaChannel
 from bots.kitobxon.repositories import (
@@ -200,6 +201,7 @@ class AdminService:
         )
         self.session.add(ch)
         await self.session.flush()
+        runtime_cache.invalidate_active_channels()
         return ch
 
     async def toggle_channel(self, channel_db_id: int, active: bool) -> None:
@@ -207,11 +209,13 @@ class AdminService:
         if ch:
             ch.active = active
             await self.session.flush()
+            runtime_cache.invalidate_active_channels()
 
     async def delete_channel(self, channel_db_id: int) -> None:
         ch = await self.channels.get(channel_db_id)
         if ch:
             await self.channels.delete(ch)
+            runtime_cache.invalidate_active_channels()
 
     async def list_channels(self) -> list[Channel]:
         return await self.channels.list_all()
@@ -228,12 +232,14 @@ class AdminService:
         )
         self.session.add(zch)
         await self.session.flush()
+        runtime_cache.invalidate_zayafka_channels()
         return zch
 
     async def delete_zayafka_channel(self, db_id: int) -> None:
         zch = await self.zayafka.get(db_id)
         if zch:
             await self.zayafka.delete(zch)
+            runtime_cache.invalidate_zayafka_channels()
 
     async def list_zayafka_channels(self) -> list[ZayafkaChannel]:
         return await self.zayafka.list_ordered()
@@ -256,12 +262,14 @@ class AdminService:
         )
         self.session.add(q)
         await self.session.flush()
+        runtime_cache.invalidate_question_ids()
         return q
 
     async def delete_question(self, question_id: int) -> None:
         q = await self.quiz.get(question_id)
         if q:
             await self.quiz.delete(q)
+            runtime_cache.invalidate_question_ids()
 
     async def list_questions(self) -> list[Question]:
         return await self.quiz.list()

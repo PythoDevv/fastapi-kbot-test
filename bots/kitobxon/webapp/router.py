@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 from datetime import datetime
+from functools import lru_cache
 
 from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import HTMLResponse
@@ -54,13 +55,22 @@ def _q_out(payload) -> QuestionOut:
     )
 
 
-@router.get("/", response_class=HTMLResponse, include_in_schema=False)
-async def webapp_index(request: Request):
+@lru_cache(maxsize=1)
+def _load_webapp_html() -> str:
     import os
-    html_path = os.path.join(os.path.dirname(__file__), "../../../static/webapp/index.html")
+
+    html_path = os.path.join(
+        os.path.dirname(__file__),
+        "../../../static/webapp/index.html",
+    )
     html_path = os.path.abspath(html_path)
     with open(html_path, encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+        return f.read()
+
+
+@router.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def webapp_index(request: Request):
+    return HTMLResponse(_load_webapp_html())
 
 
 @router.post("/auth", response_model=AuthResponse)

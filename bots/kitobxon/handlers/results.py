@@ -23,10 +23,16 @@ def _split_text(text: str) -> list[str]:
     return parts
 
 
-def _format_user_line(rank: int, user, score: int, current: bool) -> str:
+def _format_user_line(
+    rank: int,
+    user,
+    value: int,
+    current: bool,
+    suffix: str = "ball",
+) -> str:
     name = user.fio or user.username or "-"
     prefix = "👉 " if current else ""
-    return f"{prefix}{rank}. {name} — {score} ball"
+    return f"{prefix}{rank}. {name} — {value} {suffix}"
 
 
 def _format_time(seconds: int) -> str:
@@ -48,23 +54,35 @@ async def _send_text_parts(message, parts: list[str], keyboard=None) -> None:
 async def show_results(message: Message, session: AsyncSession) -> None:
     service = ResultsService(session)
     result = await service.get_user_result(message.from_user.id)
-    top_scores = await service.top_by_score(message.from_user.id)
+    detailed_result = await service.get_detailed_test_result(message.from_user.id)
+    top_referrals = await service.top_by_referrals(message.from_user.id, limit=30)
     top_test_takers = await service.top_test_takers(message.from_user.id)
 
     lines = ["<b>🌟 Natijalar</b>\n"]
 
     if result:
         status = "✅ O'tdingiz" if result.passed else "❌ O'ta olmadingiz"
+        time_line = ""
+        if detailed_result:
+            time_line = f"\nSarflagan vaqt: <b>{_format_time(detailed_result.total_time_seconds)}</b>"
         lines.append(
-            f"Sizning natijangiz: <b>{result.user.score}/{result.total_questions}</b> — {status}\n"
+            f"Sizning natijangiz: <b>{result.user.score}/{result.total_questions}</b> — {status}{time_line}\n"
         )
     else:
         lines.append("Siz hali test yechmagansiz.\n")
 
-    if top_scores:
-        lines.append("<b>🏆 Top 30 umumiy ball bo'yicha</b>")
-        for entry in top_scores:
-            lines.append(_format_user_line(entry.rank, entry.user, entry.user.score or 0, entry.is_current))
+    if top_referrals:
+        lines.append("<b>🏆 Top 30 referal bo'yicha</b>")
+        for entry in top_referrals:
+            lines.append(
+                _format_user_line(
+                    entry.rank,
+                    entry.user,
+                    entry.user.referrals_count or 0,
+                    entry.is_current,
+                    "ta",
+                )
+            )
         lines.append("")
 
     if top_test_takers:
@@ -85,14 +103,12 @@ async def show_test_results(cb: CallbackQuery, session: AsyncSession) -> None:
         await cb.answer("Test natijalari topilmadi.", show_alert=True)
         return
 
-    status = "✅ O'tdingiz" if result.passed else "❌ O'ta olmadingiz"
     time_str = _format_time(result.total_time_seconds)
 
     text = (
         f"<b>📊 Test natijalari</b>\n\n"
         f"<b>To'g'ri:</b> {result.correct_count}/{result.total_questions}\n"
         f"<b>Vaqt sarflagan:</b> {time_str}\n"
-        f"<b>Status:</b> {status}"
     )
 
     await cb.message.edit_text(
@@ -105,7 +121,7 @@ async def show_test_results(cb: CallbackQuery, session: AsyncSession) -> None:
 @router.callback_query(F.data == "res_referral")
 async def show_referral_results(cb: CallbackQuery, session: AsyncSession) -> None:
     service = ResultsService(session)
-    user_ref_top = await service.top_by_referrals(cb.from_user.id, limit=10)
+    user_ref_top = await service.top_by_referrals(cb.from_user.id, limit=30)
 
     user_count = None
     for entry in user_ref_top:
@@ -121,7 +137,7 @@ async def show_referral_results(cb: CallbackQuery, session: AsyncSession) -> Non
         lines.append("Siz taklif qilmagan edingiz.\n")
 
     if user_ref_top:
-        lines.append("<b>🏆 Referral bo'yicha top 10:</b>")
+        lines.append("<b>🏆 Referral bo'yicha top 30:</b>")
         for entry in user_ref_top:
             marker = "👉 " if entry.is_current else ""
             lines.append(
@@ -139,23 +155,35 @@ async def show_referral_results(cb: CallbackQuery, session: AsyncSession) -> Non
 async def back_to_results(cb: CallbackQuery, session: AsyncSession) -> None:
     service = ResultsService(session)
     result = await service.get_user_result(cb.from_user.id)
-    top_scores = await service.top_by_score(cb.from_user.id)
+    detailed_result = await service.get_detailed_test_result(cb.from_user.id)
+    top_referrals = await service.top_by_referrals(cb.from_user.id, limit=30)
     top_test_takers = await service.top_test_takers(cb.from_user.id)
 
     lines = ["<b>🌟 Natijalar</b>\n"]
 
     if result:
         status = "✅ O'tdingiz" if result.passed else "❌ O'ta olmadingiz"
+        time_line = ""
+        if detailed_result:
+            time_line = f"\nSarflagan vaqt: <b>{_format_time(detailed_result.total_time_seconds)}</b>"
         lines.append(
-            f"Sizning natijangiz: <b>{result.user.score}/{result.total_questions}</b> — {status}\n"
+            f"Sizning natijangiz: <b>{result.user.score}/{result.total_questions}</b> — {status}{time_line}\n"
         )
     else:
         lines.append("Siz hali test yechmagansiz.\n")
 
-    if top_scores:
-        lines.append("<b>🏆 Top 30 umumiy ball bo'yicha</b>")
-        for entry in top_scores:
-            lines.append(_format_user_line(entry.rank, entry.user, entry.user.score or 0, entry.is_current))
+    if top_referrals:
+        lines.append("<b>🏆 Top 30 referal bo'yicha</b>")
+        for entry in top_referrals:
+            lines.append(
+                _format_user_line(
+                    entry.rank,
+                    entry.user,
+                    entry.user.referrals_count or 0,
+                    entry.is_current,
+                    "ta",
+                )
+            )
         lines.append("")
 
     if top_test_takers:

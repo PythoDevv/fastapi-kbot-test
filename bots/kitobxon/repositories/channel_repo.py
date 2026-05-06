@@ -1,5 +1,10 @@
 from sqlalchemy import select
 
+from bots.kitobxon.cache import (
+    ChannelSnapshot,
+    ZayafkaChannelSnapshot,
+    runtime_cache,
+)
 from bots.kitobxon.models import (
     Channel,
     UserZayafkaChannel,
@@ -19,6 +24,25 @@ class ChannelRepository(BaseRepository[Channel]):
         )
         return list((await self.session.execute(stmt)).scalars().all())
 
+    async def list_active_cached(self) -> list[ChannelSnapshot]:
+        cached = runtime_cache.get_active_channels()
+        if cached is not None:
+            return cached
+
+        rows = await self.list_active()
+        snapshots = [
+            ChannelSnapshot(
+                id=channel.id,
+                channel_id=channel.channel_id,
+                channel_name=channel.channel_name,
+                channel_link=channel.channel_link,
+                skip_check=channel.skip_check,
+            )
+            for channel in rows
+        ]
+        runtime_cache.set_active_channels(snapshots)
+        return snapshots
+
     async def list_all(self) -> list[Channel]:
         return list(
             (await self.session.execute(select(Channel).order_by(Channel.id)))
@@ -35,6 +59,25 @@ class ZayafkaRepository(BaseRepository[ZayafkaChannel]):
             ZayafkaChannel.sequence, ZayafkaChannel.id
         )
         return list((await self.session.execute(stmt)).scalars().all())
+
+    async def list_ordered_cached(self) -> list[ZayafkaChannelSnapshot]:
+        cached = runtime_cache.get_zayafka_channels()
+        if cached is not None:
+            return cached
+
+        rows = await self.list_ordered()
+        snapshots = [
+            ZayafkaChannelSnapshot(
+                id=channel.id,
+                channel_id=channel.channel_id,
+                name=channel.name,
+                link=channel.link,
+                sequence=channel.sequence,
+            )
+            for channel in rows
+        ]
+        runtime_cache.set_zayafka_channels(snapshots)
+        return snapshots
 
     async def get_user_recorded_ids(self, user_id: int) -> set[int]:
         stmt = select(UserZayafkaChannel.zayafka_channel_id).where(

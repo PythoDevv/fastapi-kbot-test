@@ -11,11 +11,11 @@ def subscription_keyboard(
     buttons: list[list[InlineKeyboardButton]] = []
     for ch in missing_channels:
         buttons.append(
-            [InlineKeyboardButton(text=f"➡️ {ch.channel_name}", url=ch.channel_link or "")]
+            [InlineKeyboardButton(text=f"{ch.channel_name}", url=ch.channel_link or "")]
         )
     for zch in missing_zayafka:
         buttons.append(
-            [InlineKeyboardButton(text=f"➡️ {zch.name}", url=zch.link or "")]
+            [InlineKeyboardButton(text=f"{zch.name}", url=zch.link or "")]
         )
     buttons.append(
         [InlineKeyboardButton(text="✅ Tekshirish", callback_data="check_subscription")]

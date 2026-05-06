@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     Enum as SAEnum,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -152,6 +153,9 @@ class Question(Base, TimestampMixin):
 
 class TestSession(Base, TimestampMixin):
     __tablename__ = t("test_sessions")
+    __table_args__ = (
+        Index("ix_kitobxon_test_sessions_user_completed_id", "user_id", "is_completed", "id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(
@@ -186,6 +190,9 @@ class TestSession(Base, TimestampMixin):
 
 class TestAnswer(Base, TimestampMixin):
     __tablename__ = t("test_answers")
+    __table_args__ = (
+        Index("ix_kitobxon_test_answers_session_question", "session_id", "question_index"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     session_id: Mapped[int] = mapped_column(
@@ -214,6 +221,9 @@ class PollMap(Base, TimestampMixin):
     """Maps Telegram poll_id → active test session question (quiz mode only)."""
 
     __tablename__ = t("poll_map")
+    __table_args__ = (
+        Index("ix_kitobxon_poll_map_session_id", "session_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     poll_id: Mapped[str] = mapped_column(

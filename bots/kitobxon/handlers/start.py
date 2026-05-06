@@ -13,6 +13,12 @@ logger = get_logger(__name__)
 router = Router(name="start")
 
 
+def _subscription_prompt_text(has_missing: bool) -> str:
+    if has_missing:
+        return "Quyidagi kanallarga hali obuna bo'lmadingiz:"
+    return "Botdan foydalanish uchun quyidagi kanallarga obuna bo'ling:"
+
+
 async def _continue_after_subscription(
     message: Message,
     state: FSMContext,
@@ -56,14 +62,22 @@ async def cmd_start(
     status = await subs.check_user(bot, message.from_user.id, result.user.id)
     if not status.all_subscribed:
         await message.answer(
-            "Botdan foydalanish uchun quyidagi kanallarga obuna bo'ling:",
+            _subscription_prompt_text(False),
             reply_markup=inline.subscription_keyboard(
                 status.missing_channels, status.missing_zayafka
             ),
         )
         return
 
-    await auth.award_referral_bonus_if_eligible(message.from_user.id)
+    referral_result = await auth.award_referral_bonus_if_eligible(message.from_user.id)
+    if referral_result:
+        referrer_id, referrer_referrals = referral_result
+        await bot.send_message(
+            referrer_id,
+            f"{result.user.fio or result.user.username or message.from_user.first_name} "
+            "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
+            f"Sizdagi referallar soni: <b>{referrer_referrals}</b>",
+        )
     await _continue_after_subscription(message, state, result.user.is_registered)
 
 
@@ -82,16 +96,25 @@ async def check_subscription(
 
     if status.all_subscribed:
         await cb.message.delete()
-        await auth.award_referral_bonus_if_eligible(cb.from_user.id)
+        referral_result = await auth.award_referral_bonus_if_eligible(cb.from_user.id)
+        if referral_result:
+            referrer_id, referrer_referrals = referral_result
+            await bot.send_message(
+                referrer_id,
+                f"{result.user.fio or result.user.username or cb.from_user.first_name} "
+                "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
+                f"Sizdagi referallar soni: <b>{referrer_referrals}</b>",
+            )
         await _continue_after_subscription(
             cb.message,
             state,
             result.user.is_registered,
         )
     else:
-        await cb.answer("Hali barcha kanallarga obuna bo'lmadingiz!", show_alert=True)
-        await cb.message.edit_reply_markup(
+        await cb.answer()
+        await cb.message.edit_text(
+            _subscription_prompt_text(True),
             reply_markup=inline.subscription_keyboard(
                 status.missing_channels, status.missing_zayafka
-            )
+            ),
         )
