@@ -13,6 +13,7 @@ from bots.kitobxon.states import (
 )
 
 router = Router(name="admin_users")
+MAX_REASONABLE_REFERRAL_COUNT = 1_000_000
 
 
 async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
@@ -154,6 +155,16 @@ async def set_referral_count(
         new_count = int((message.text or "").strip())
     except ValueError:
         await message.answer("Iltimos, son kiriting:")
+        return
+
+    if new_count < 0:
+        await message.answer("Referallar soni manfiy bo'lishi mumkin emas.")
+        return
+    if new_count > MAX_REASONABLE_REFERRAL_COUNT:
+        await message.answer(
+            "Bu juda katta son. Telegram ID yuborib yuborgan bo'lishingiz mumkin.\n"
+            "Iltimos, haqiqiy referallar sonini yuboring."
+        )
         return
 
     data = await state.get_data()

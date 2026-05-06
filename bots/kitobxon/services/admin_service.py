@@ -41,6 +41,8 @@ class ReferralScoreRepairResult:
 
 
 class AdminService:
+    MAX_REASONABLE_REFERRAL_COUNT = 1_000_000
+
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
         self.users = UserRepository(session)
@@ -106,6 +108,8 @@ class AdminService:
         new_count: int,
         reason: str | None,
     ) -> User:
+        if new_count < 0 or new_count > self.MAX_REASONABLE_REFERRAL_COUNT:
+            raise ValueError("Referral count is out of allowed range")
         user = await self.users.get_by_telegram_id(target_telegram_id)
         if user is None:
             from bots.kitobxon.exceptions import UserNotFoundError
