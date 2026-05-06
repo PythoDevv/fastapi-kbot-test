@@ -257,7 +257,7 @@ async def start_quiz(
         return
 
     confirmed_referrals = await user_repo.count_confirmed_referrals(message.from_user.id)
-    if confirmed_referrals < MIN_CONFIRMED_REFERRALS_TO_START:
+    if not user.is_admin and confirmed_referrals < MIN_CONFIRMED_REFERRALS_TO_START:
         remaining = MIN_CONFIRMED_REFERRALS_TO_START - confirmed_referrals
         await message.answer(
             "Testni ishlash uchun kamida "

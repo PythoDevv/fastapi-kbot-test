@@ -5,7 +5,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import reply
-from bots.kitobxon.repositories import BookRepository
+from bots.kitobxon.repositories import BookRepository, ContentRepository
 from bots.kitobxon.services import AdminService
 from bots.kitobxon.states import AdminContentStates
 
@@ -163,6 +163,10 @@ def _referral_link_choice_keyboard() -> InlineKeyboardMarkup:
     )
 
 
+def _referral_draft_key(telegram_id: int) -> str:
+    return f"refdraft:{telegram_id}"
+
+
 @router.message(F.text == "📝 Kontentlar")
 async def legacy_content_menu(message: Message, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
@@ -217,16 +221,23 @@ async def save_content_message(
     if data["action"] == "waiting_post":
         await service.set_waiting_post(text=text, image_id=image_id)
     else:
-        await service.save_content_post(
-            key=str(data["key"]),
-            text=text,
-            image_id=image_id,
-            require_link=False if data.get("key") == "referral" else bool(data.get("require_link", False)),
-        )
+        if data.get("key") == "referral":
+            await service.save_content_post(
+                key=_referral_draft_key(message.from_user.id),
+                text=text,
+                image_id=image_id,
+                require_link=False,
+            )
+        else:
+            await service.save_content_post(
+                key=str(data["key"]),
+                text=text,
+                image_id=image_id,
+                require_link=bool(data.get("require_link", False)),
+            )
 
     if data.get("key") == "referral":
-        await state.set_state(AdminContentStates.waiting_referral_link_choice)
-        await state.update_data(saved_text=text, saved_image_id=image_id)
+        await state.clear()
         await message.answer(
             "Link va tugma qo'yilsinmi?",
             reply_markup=_referral_link_choice_keyboard(),
@@ -238,10 +249,7 @@ async def save_content_message(
     await _show_content_preview(message, text=text, image_id=image_id)
 
 
-@router.callback_query(
-    AdminContentStates.waiting_referral_link_choice,
-    F.data.in_({"referral_link:yes", "referral_link:no"}),
-)
+@router.callback_query(F.data.in_({"referral_link:yes", "referral_link:no"}))
 async def set_referral_link_choice(
     cb: CallbackQuery, state: FSMContext, session: AsyncSession
 ) -> None:
@@ -250,14 +258,22 @@ async def set_referral_link_choice(
         return
 
     include_link = cb.data.endswith(":yes")
-    data = await state.get_data()
+    draft_key = _referral_draft_key(cb.from_user.id)
+    content_repo = ContentRepository(session)
+    draft = await content_repo.get_by_key(draft_key)
+    if draft is None:
+        await state.clear()
+        await cb.answer("Draft topilmadi. Postni qayta yuboring.", show_alert=True)
+        return
+
     await AdminService(session).save_content_post(
         key="referral",
-        text=data.get("saved_text"),
-        image_id=data.get("saved_image_id"),
+        text=draft.text,
+        image_id=draft.image_id,
         require_link=include_link,
         append=True,
     )
+    await content_repo.delete_by_key(draft_key)
     await state.clear()
     await cb.message.edit_text(
         "✅ Saqlandi. Link va tugma qo'yiladi."
@@ -270,8 +286,8 @@ async def set_referral_link_choice(
     )
     await _show_referral_preview(
         cb.message,
-        text=data.get("saved_text"),
-        image_id=data.get("saved_image_id"),
+        text=draft.text,
+        image_id=draft.image_id,
         include_link=include_link,
     )
     await cb.answer()
