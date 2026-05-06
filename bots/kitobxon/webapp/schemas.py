@@ -34,6 +34,7 @@ class AnswerResponse(BaseModel):
     is_last: bool
     next_question: QuestionOut | None = None
     total_questions: int
+    total_time_seconds: int
 
 
 StartResponse.model_rebuild()

@@ -16,6 +16,31 @@ from core.config import settings
 router = Router(name="menu")
 
 BASE_URL = settings.BASE_WEBHOOK_URL
+PHOTO_CAPTION_LIMIT = 1024
+
+
+async def _answer_photo_with_safe_text(
+    message: Message,
+    *,
+    photo: str,
+    text: str,
+    reply_markup=None,
+) -> None:
+    if len(text) > PHOTO_CAPTION_LIMIT:
+        await message.answer_photo(photo=photo)
+        await message.answer(
+            text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup,
+        )
+        return
+
+    await message.answer_photo(
+        photo=photo,
+        caption=text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=reply_markup,
+    )
 
 
 @router.message(F.text == "🏠 Asosiy menyu")
@@ -73,10 +98,10 @@ async def referral_link(message: Message, session: AsyncSession) -> None:
             )
 
         if content.image_id:
-            await message.answer_photo(
+            await _answer_photo_with_safe_text(
+                message,
                 photo=content.image_id,
-                caption=final_text,
-                parse_mode=ParseMode.HTML,
+                text=final_text,
                 reply_markup=reply_markup,
             )
         else:
@@ -95,10 +120,10 @@ async def show_nizom(message: Message, session: AsyncSession) -> None:
         await message.answer("Tanlov shartlari hali kiritilmagan.")
         return
     if content.image_id:
-        await message.answer_photo(
+        await _answer_photo_with_safe_text(
+            message,
             photo=content.image_id,
-            caption=content.text or "",
-            parse_mode=ParseMode.HTML,
+            text=content.text or "",
         )
     else:
         await message.answer(
@@ -150,10 +175,10 @@ async def show_prizes(message: Message, session: AsyncSession) -> None:
         await message.answer("Sovg'alar haqida ma'lumot hali kiritilmagan.")
         return
     if content.image_id:
-        await message.answer_photo(
+        await _answer_photo_with_safe_text(
+            message,
             photo=content.image_id,
-            caption=content.text or "",
-            parse_mode=ParseMode.HTML,
+            text=content.text or "",
         )
     else:
         await message.answer(

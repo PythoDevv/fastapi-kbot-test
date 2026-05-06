@@ -10,6 +10,7 @@ from bots.kitobxon.services import AdminService
 from bots.kitobxon.states import AdminContentStates
 
 router = Router(name="admin_content")
+PHOTO_CAPTION_LIMIT = 1024
 
 CONTENT_BUTTONS: dict[str, dict[str, object]] = {
     "Test stop posti": {
@@ -67,11 +68,15 @@ async def _show_content_preview(
     image_id: str | None,
 ) -> None:
     if image_id:
-        await message.answer_photo(
-            photo=image_id,
-            caption=text or "",
-            parse_mode=ParseMode.HTML,
-        )
+        if text and len(text) > PHOTO_CAPTION_LIMIT:
+            await message.answer_photo(photo=image_id)
+            await message.answer(text, parse_mode=ParseMode.HTML)
+        else:
+            await message.answer_photo(
+                photo=image_id,
+                caption=text or "",
+                parse_mode=ParseMode.HTML,
+            )
     else:
         await message.answer(
             text or "Matn saqlanmadi, faqat rasm o'rnatildi.",
@@ -105,12 +110,20 @@ async def _show_referral_preview(
         )
 
     if image_id:
-        await message.answer_photo(
-            photo=image_id,
-            caption=final_text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=reply_markup,
-        )
+        if len(final_text) > PHOTO_CAPTION_LIMIT:
+            await message.answer_photo(photo=image_id)
+            await message.answer(
+                final_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup,
+            )
+        else:
+            await message.answer_photo(
+                photo=image_id,
+                caption=final_text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup,
+            )
     else:
         await message.answer(
             final_text,

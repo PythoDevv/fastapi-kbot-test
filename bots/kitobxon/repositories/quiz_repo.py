@@ -307,6 +307,12 @@ class QuizRepository(BaseRepository[Question]):
         )
         return list((await self.session.execute(stmt)).scalars().all())
 
+    async def sum_answer_time(self, session_id: int) -> int:
+        stmt = select(func.coalesce(func.sum(TestAnswer.time_taken_seconds), 0)).where(
+            TestAnswer.session_id == session_id
+        )
+        return int((await self.session.execute(stmt)).scalar_one() or 0)
+
     # --- Poll map (native quiz mode only) ---
     async def register_poll(
         self,

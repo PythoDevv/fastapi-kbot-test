@@ -46,6 +46,7 @@ class AnswerResult:
     score: int
     total_questions: int
     next_question: QuestionPayload | None
+    total_time_seconds: int
 
 
 class QuizService:
@@ -167,6 +168,7 @@ class QuizService:
                     score=test_session.score,
                     total_questions=test_session.total_questions,
                     next_question=current_payload,
+                    total_time_seconds=await self.quiz.sum_answer_time(session_id),
                 )
             raise QuizNotActiveError("Noto'g'ri savol tartibi")
         if await self.quiz.answer_exists(session_id, question_index):
@@ -176,6 +178,7 @@ class QuizService:
                 score=test_session.score,
                 total_questions=test_session.total_questions,
                 next_question=current_payload,
+                total_time_seconds=await self.quiz.sum_answer_time(session_id),
             )
 
         question_ids, _ = self.quiz.decode_session_questions(test_session.questions_json)
@@ -207,6 +210,8 @@ class QuizService:
         if is_correct:
             await self.quiz.add_score(session_id, 1)
 
+        total_time_seconds = await self.quiz.sum_answer_time(session_id)
+
         next_index = question_index + 1
         is_last = next_index >= test_session.total_questions
 
@@ -219,6 +224,7 @@ class QuizService:
                 score=current_score,
                 total_questions=test_session.total_questions,
                 next_question=None,
+                total_time_seconds=total_time_seconds,
             )
 
         await self.quiz.advance_session(session_id, next_index)
@@ -234,6 +240,7 @@ class QuizService:
             score=test_session.score + (1 if is_correct else 0),
             total_questions=test_session.total_questions,
             next_question=next_payload,
+            total_time_seconds=total_time_seconds,
         )
 
     async def _finalize_session(self, user_id: int, final_score: int) -> None:

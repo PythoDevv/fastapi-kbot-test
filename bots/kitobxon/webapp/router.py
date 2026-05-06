@@ -2,6 +2,9 @@ from collections.abc import AsyncGenerator
 from datetime import datetime
 from functools import lru_cache
 
+from aiogram import Bot
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,6 +55,20 @@ def _q_out(payload) -> QuestionOut:
         index=payload.index,
         text=payload.question.text,
         options=payload.options,
+    )
+
+
+def _format_total_time(seconds: int) -> str:
+    minutes = seconds // 60
+    secs = seconds % 60
+    return f"{minutes}m {secs}s"
+
+
+@lru_cache(maxsize=1)
+def _get_bot() -> Bot:
+    return Bot(
+        token=settings.KITOBXON_BOT_TOKEN,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
 
 
@@ -131,7 +148,7 @@ async def submit_answer(
     db: AsyncSession = Depends(get_db),
 ):
     token = get_token_from_header(authorization)
-    verify_token(token, settings.WEBAPP_JWT_SECRET)
+    telegram_id = verify_token(token, settings.WEBAPP_JWT_SECRET)
 
     service = QuizService(db)
     is_timeout = body.selected_option is None
@@ -149,9 +166,21 @@ async def submit_answer(
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail=str(e))
 
+    if result.is_last:
+        try:
+            await _get_bot().send_message(
+                telegram_id,
+                "🧑‍💻 WebApp test yakunlandi.\n\n"
+                f"Natija: <b>{result.score}/{result.total_questions}</b>\n"
+                f"Sarflagan vaqt: <b>{_format_total_time(result.total_time_seconds)}</b>",
+            )
+        except Exception:
+            logger.exception("Failed to send WebApp result message user=%s", telegram_id)
+
     return AnswerResponse(
         score=result.score,
         is_last=result.is_last,
         next_question=_q_out(result.next_question) if result.next_question else None,
         total_questions=result.total_questions,
+        total_time_seconds=result.total_time_seconds,
     )

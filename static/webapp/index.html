@@ -341,7 +341,7 @@ async function submitAnswer(answer) {
     });
 
     if (res.is_last) {
-      showResult(res.score, res.total_questions);
+      showResult(res.score, res.total_questions, res.total_time_seconds);
     } else {
       renderQuestion(res.next_question, res.total_questions, timeLimitSec);
     }
@@ -354,15 +354,22 @@ async function submitAnswer(answer) {
   }
 }
 
-function showResult(score, total) {
+function formatDuration(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${minutes}m ${secs}s`;
+}
+
+function showResult(score, total, totalTimeSeconds) {
   document.getElementById('app').style.display = 'none';
   document.getElementById('loading').style.display = 'none';
   const rs = document.getElementById('result-screen');
   rs.style.display = 'block';
-  document.getElementById('result-score').textContent = 'Natija: ' + score + ' / ' + total;
+  document.getElementById('result-score').innerHTML =
+    'Natija: ' + score + ' / ' + total + '<br>Sarflagan vaqt: ' + formatDuration(totalTimeSeconds);
   document.getElementById('result-icon').textContent = score >= total * 0.6 ? '🏆' : '📝';
   // Notify Telegram
-  tg.sendData(JSON.stringify({ score, total }));
+  tg.sendData(JSON.stringify({ score, total, total_time_seconds: totalTimeSeconds }));
 }
 
 async function init() {

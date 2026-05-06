@@ -68,6 +68,7 @@ async def _timeout_task(
     session_id: int,
     question_index: int,
     time_limit: int,
+    message_id: int | None,
 ) -> None:
     """Auto-submit answer as timeout after time_limit seconds (WEB mode)"""
     try:
@@ -87,6 +88,12 @@ async def _timeout_task(
             )
             return
 
+        if message_id:
+            try:
+                await bot.delete_message(chat_id, message_id)
+            except Exception:
+                pass
+
         if result.is_last:
             await bot.send_message(chat_id, _finish_text(result.score, result.total_questions))
             await bot.send_message(chat_id, "Asosiy menyu:", reply_markup=reply.main_menu())
@@ -99,16 +106,24 @@ async def _timeout_task(
             question_sent_at=datetime.utcnow().isoformat()
         )
 
-        await bot.send_message(
+        next_message = await bot.send_message(
             chat_id,
             _format_question(result.next_question),
             reply_markup=inline.quiz_keyboard(result.next_question),
             protect_content=True,
         )
+        await state.update_data(question_message_id=next_message.message_id)
 
         # Schedule next timeout
         _schedule_timeout(
-            chat_id, bot, service, state, session_id, result.next_question.index, time_limit
+            chat_id,
+            bot,
+            service,
+            state,
+            session_id,
+            result.next_question.index,
+            time_limit,
+            next_message.message_id,
         )
 
     except asyncio.CancelledError:
@@ -193,11 +208,21 @@ def _schedule_timeout(
     session_id: int,
     question_index: int,
     time_limit: int,
+    message_id: int | None,
 ) -> None:
     """Schedule a timeout task for user (WEB mode)"""
     _cancel_timeout(user_id)
     task = asyncio.create_task(
-        _timeout_task(bot, user_id, service, state, session_id, question_index, time_limit)
+        _timeout_task(
+            bot,
+            user_id,
+            service,
+            state,
+            session_id,
+            question_index,
+            time_limit,
+            message_id,
+        )
     )
     _timeout_tasks[user_id] = task
 
@@ -292,11 +317,12 @@ async def start_quiz(
                 reply_markup=inline.webapp_quiz_keyboard(webapp_url),
             )
         elif session_quiz_type == QuizType.WEB:
-            await message.answer(
+            sent_message = await message.answer(
                 _format_question(payload),
                 reply_markup=inline.quiz_keyboard(payload),
                 protect_content=True,
             )
+            await state.update_data(question_message_id=sent_message.message_id)
             _schedule_timeout(
                 message.chat.id,
                 bot,
@@ -305,6 +331,7 @@ async def start_quiz(
                 active_session.id,
                 active_session.current_index,
                 settings.time_limit_seconds,
+                sent_message.message_id,
             )
         else:
             await service.delete_session_polls(active_session.id)
@@ -339,11 +366,12 @@ async def start_quiz(
             reply_markup=inline.webapp_quiz_keyboard(webapp_url),
         )
     elif result.quiz_type == QuizType.WEB:
-        await message.answer(
+        sent_message = await message.answer(
             _format_question(result.first_question),
             reply_markup=inline.quiz_keyboard(result.first_question),
             protect_content=True,
         )
+        await state.update_data(question_message_id=sent_message.message_id)
         _schedule_timeout(
             message.chat.id,
             bot,
@@ -352,6 +380,7 @@ async def start_quiz(
             result.session.id,
             0,
             result.settings.time_limit_seconds,
+            sent_message.message_id,
         )
     else:
         await _send_poll_question(
@@ -375,6 +404,7 @@ async def handle_web_answer(
     data = await state.get_data()
     session_id: int = data["session_id"]
     index: int = data["index"]
+    current_message_id: int | None = data.get("question_message_id")
 
     # Cancel timeout task
     _cancel_timeout(cb.from_user.id)
@@ -407,7 +437,10 @@ async def handle_web_answer(
 
     if result.is_last:
         await state.clear()
-        await cb.message.edit_reply_markup(reply_markup=None)
+        try:
+            await cb.message.delete()
+        except Exception:
+            await cb.message.edit_reply_markup(reply_markup=None)
         await _send_finish_and_menu(
             cb.message,
             score=result.score,
@@ -419,10 +452,18 @@ async def handle_web_answer(
         index=result.next_question.index,
         question_sent_at=datetime.utcnow().isoformat(),
     )
-    await cb.message.edit_text(
+    if current_message_id:
+        try:
+            await bot.delete_message(cb.message.chat.id, current_message_id)
+        except Exception:
+            pass
+
+    next_message = await cb.message.answer(
         _format_question(result.next_question),
         reply_markup=inline.quiz_keyboard(result.next_question),
+        protect_content=True,
     )
+    await state.update_data(question_message_id=next_message.message_id)
 
     # Schedule timeout for next question
     settings = await service.quiz.get_settings()
@@ -435,6 +476,7 @@ async def handle_web_answer(
             session_id,
             result.next_question.index,
             settings.time_limit_seconds,
+            next_message.message_id,
         )
 
 

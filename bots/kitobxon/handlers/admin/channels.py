@@ -10,6 +10,10 @@ from bots.kitobxon.states import AdminChannelStates, AdminZayafkaStates
 router = Router(name="admin_channels")
 
 
+def _message_text(message: Message) -> str:
+    return (message.text or message.caption or "").strip()
+
+
 async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
     if telegram_id == 935795577:
         return True
@@ -102,7 +106,7 @@ async def start_add_channel(message: Message, state: FSMContext, session: AsyncS
 
 @router.message(AdminChannelStates.waiting_name)
 async def channel_name(message: Message, state: FSMContext) -> None:
-    text = (message.text or "").strip()
+    text = _message_text(message)
     if not text:
         await message.answer("Kanal nomini matn ko'rinishida yuboring.")
         return
@@ -113,7 +117,7 @@ async def channel_name(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminChannelStates.waiting_link)
 async def channel_link(message: Message, state: FSMContext) -> None:
-    link = (message.text or "").strip()
+    link = _message_text(message)
     if not link:
         await message.answer("Kanal linkini matn ko'rinishida yuboring.")
         return
@@ -127,7 +131,7 @@ async def channel_id_input(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
     try:
-        ch_id = int((message.text or "").strip())
+        ch_id = int(_message_text(message))
     except ValueError:
         await message.answer("ID son bo'lishi kerak:")
         return
@@ -204,7 +208,7 @@ async def start_add_zayafka(
 
 @router.message(AdminZayafkaStates.waiting_name)
 async def zayafka_name(message: Message, state: FSMContext) -> None:
-    text = (message.text or "").strip()
+    text = _message_text(message)
     if not text:
         await message.answer("Yopiq kanal nomini matn ko'rinishida yuboring.")
         return
@@ -215,7 +219,7 @@ async def zayafka_name(message: Message, state: FSMContext) -> None:
 
 @router.message(AdminZayafkaStates.waiting_link)
 async def zayafka_link(message: Message, state: FSMContext) -> None:
-    link = (message.text or "").strip()
+    link = _message_text(message)
     if not link:
         await message.answer("Yopiq kanal linkini matn ko'rinishida yuboring.")
         return
@@ -229,7 +233,7 @@ async def zayafka_channel_id(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
     try:
-        ch_id = int((message.text or "").strip())
+        ch_id = int(_message_text(message))
     except ValueError:
         await message.answer("ID son bo'lishi kerak:")
         return

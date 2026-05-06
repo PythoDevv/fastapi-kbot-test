@@ -61,12 +61,11 @@ async def show_results(message: Message, session: AsyncSession) -> None:
     lines = ["<b>🌟 Natijalar</b>\n"]
 
     if result:
-        status = "✅ O'tdingiz" if result.passed else "❌ O'ta olmadingiz"
         time_line = ""
         if detailed_result:
             time_line = f"\nSarflagan vaqt: <b>{_format_time(detailed_result.total_time_seconds)}</b>"
         lines.append(
-            f"Sizning natijangiz: <b>{result.user.score}/{result.total_questions}</b> — {status}{time_line}\n"
+            f"Sizning natijangiz: <b>{result.user.score}/{result.total_questions}</b> — {time_line}\n"
         )
     else:
         lines.append("Siz hali test yechmagansiz.\n")
@@ -162,12 +161,11 @@ async def back_to_results(cb: CallbackQuery, session: AsyncSession) -> None:
     lines = ["<b>🌟 Natijalar</b>\n"]
 
     if result:
-        status = "✅ O'tdingiz" if result.passed else "❌ O'ta olmadingiz"
         time_line = ""
         if detailed_result:
             time_line = f"\nSarflagan vaqt: <b>{_format_time(detailed_result.total_time_seconds)}</b>"
         lines.append(
-            f"Sizning natijangiz: <b>{result.user.score}/{result.total_questions}</b> — {status}{time_line}\n"
+            f"Sizning natijangiz: <b>{result.user.score}/{result.total_questions}</b> — {time_line}\n"
         )
     else:
         lines.append("Siz hali test yechmagansiz.\n")
