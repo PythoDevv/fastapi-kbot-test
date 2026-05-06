@@ -261,6 +261,28 @@ async def start_add_channel(message: Message, state: FSMContext, session: AsyncS
     await message.answer("Kanal nomini kiriting:", reply_markup=reply.cancel_only())
 
 
+@router.message(
+    F.text == "Bekor qilish",
+    AdminChannelStates.waiting_name,
+)
+@router.message(
+    F.text == "Bekor qilish",
+    AdminChannelStates.waiting_link,
+)
+@router.message(
+    F.text == "Bekor qilish",
+    AdminChannelStates.waiting_channel_id,
+)
+async def cancel_channel_add(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    await _clear_draft(session, kind="channel", telegram_id=message.from_user.id)
+    await state.clear()
+    await message.answer("Bekor qilindi.", reply_markup=reply.admin_channels_menu())
+
+
 @router.message(AdminChannelStates.waiting_name)
 async def channel_name(message: Message, state: FSMContext, session: AsyncSession) -> None:
     await _process_channel_draft(message, state, session, kind="channel")
@@ -346,6 +368,28 @@ async def start_add_zayafka(
     await message.answer("Yopiq kanal nomini kiriting:", reply_markup=reply.cancel_only())
 
 
+@router.message(
+    F.text == "Bekor qilish",
+    AdminZayafkaStates.waiting_name,
+)
+@router.message(
+    F.text == "Bekor qilish",
+    AdminZayafkaStates.waiting_link,
+)
+@router.message(
+    F.text == "Bekor qilish",
+    AdminZayafkaStates.waiting_channel_id,
+)
+async def cancel_zayafka_add(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    await _clear_draft(session, kind="zch", telegram_id=message.from_user.id)
+    await state.clear()
+    await message.answer("Bekor qilindi.", reply_markup=reply.admin_channels_menu())
+
+
 @router.message(AdminZayafkaStates.waiting_name)
 async def zayafka_name(
     message: Message, state: FSMContext, session: AsyncSession
@@ -364,17 +408,4 @@ async def zayafka_link(
 async def zayafka_channel_id(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
-    await _process_channel_draft(message, state, session, kind="zch")
-
-
-@router.message()
-async def continue_channel_draft(
-    message: Message,
-    state: FSMContext,
-    session: AsyncSession,
-) -> None:
-    if not await _is_admin(session, message.from_user.id):
-        return
-    if await _process_channel_draft(message, state, session, kind="channel"):
-        return
     await _process_channel_draft(message, state, session, kind="zch")

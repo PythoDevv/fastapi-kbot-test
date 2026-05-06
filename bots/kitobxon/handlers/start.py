@@ -24,7 +24,13 @@ async def _continue_after_subscription(
     message: Message,
     state: FSMContext,
     is_registered: bool,
+    is_admin: bool,
 ) -> None:
+    if is_admin:
+        await state.clear()
+        await message.answer("Admin panel:", reply_markup=reply.admin_panel())
+        return
+
     if is_registered:
         await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
         return
@@ -79,7 +85,12 @@ async def cmd_start(
             "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
             f"Sizdagi referallar soni: <b>{referrer_referrals}</b>",
         )
-    await _continue_after_subscription(message, state, result.user.is_registered)
+    await _continue_after_subscription(
+        message,
+        state,
+        result.user.is_registered,
+        result.user.is_admin,
+    )
 
 
 @router.callback_query(F.data == "check_subscription")
@@ -110,6 +121,7 @@ async def check_subscription(
             cb.message,
             state,
             result.user.is_registered,
+            result.user.is_admin,
         )
     else:
         text = _subscription_prompt_text(True)
