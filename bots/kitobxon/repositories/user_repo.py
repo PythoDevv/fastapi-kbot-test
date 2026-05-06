@@ -1,4 +1,5 @@
 from sqlalchemy import delete, desc, func, select, update
+from sqlalchemy.dialects.postgresql import insert
 
 from bots.kitobxon.models import User
 from bots.kitobxon.repositories.base import BaseRepository
@@ -14,17 +15,20 @@ class UserRepository(BaseRepository[User]):
     async def get_or_create(
         self, telegram_id: int, username: str | None, fio: str | None
     ) -> tuple[User, bool]:
-        user = await self.get_by_telegram_id(telegram_id)
-        if user:
-            return user, False
-        user = User(
-            telegram_id=telegram_id,
-            username=username or "",
-            fio=fio or "",
-            step=1,
+        stmt = (
+            insert(User)
+            .values(
+                telegram_id=telegram_id,
+                username=username or "",
+                fio=fio or "",
+                step=1,
+            )
+            .on_conflict_do_nothing(index_elements=[User.telegram_id])
         )
-        await self.add(user)
-        return user, True
+        result = await self.session.execute(stmt)
+        user = await self.get_by_telegram_id(telegram_id)
+        assert user is not None
+        return user, result.rowcount > 0
 
     async def update_fields(self, telegram_id: int, **values) -> None:
         await self.session.execute(
