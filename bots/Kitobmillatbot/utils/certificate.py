@@ -5,14 +5,24 @@ Fonts: static/fonts/
 """
 import io
 import os
+from pathlib import Path
 
 from core.logging import get_logger
 
 logger = get_logger(__name__)
 
-BASE_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "static")
-CERT_TEMPLATE = os.path.join(BASE_DIR, "certificates", "template.png")
-FONT_DIR = os.path.join(BASE_DIR, "fonts")
+BASE_DIR = Path(__file__).resolve().parents[3] / "static"
+CERT_TEMPLATE = str(BASE_DIR / "certificates" / "template.png")
+ALT_CERT_TEMPLATE = str(Path(__file__).resolve().parents[1] / "certificate.png")
+FONT_DIR = str(BASE_DIR / "fonts")
+
+
+def resolve_certificate_template_path() -> str | None:
+    """Return the first available certificate template path."""
+    for candidate in (CERT_TEMPLATE, ALT_CERT_TEMPLATE):
+        if os.path.exists(candidate):
+            return candidate
+    return None
 
 
 def _get_optimal_font_size(text: str, max_width: int, base_size: int = 60) -> int:
@@ -61,13 +71,20 @@ def generate_certificate(
         logger.error("Pillow not installed")
         return None
 
-    if not os.path.exists(CERT_TEMPLATE):
-        logger.warning("Certificate template not found: %s", CERT_TEMPLATE)
+    template_path = resolve_certificate_template_path()
+    if template_path is None:
+        logger.warning(
+            "Certificate template not found. Checked paths: %s, %s",
+            CERT_TEMPLATE,
+            ALT_CERT_TEMPLATE,
+        )
         return None
+    if template_path != CERT_TEMPLATE:
+        logger.warning("Certificate template missing in static path, using fallback: %s", template_path)
 
     font_path = os.path.join(FONT_DIR, font_name)
     try:
-        img = Image.open(CERT_TEMPLATE).convert("RGBA")
+        img = Image.open(template_path).convert("RGBA")
         draw = ImageDraw.Draw(img, "RGBA")
 
         img_w, img_h = img.size
