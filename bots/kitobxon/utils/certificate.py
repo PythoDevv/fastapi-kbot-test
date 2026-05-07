@@ -16,7 +16,7 @@ BASE_DIR = Path(__file__).resolve().parents[3] / "static"
 CERT_TEMPLATE = str(BASE_DIR / "certificates" / "template.png")
 ALT_CERT_TEMPLATE = str(Path(__file__).resolve().parents[1] / "certificate.png")
 FONT_DIR = str(BASE_DIR / "fonts")
-NAME_Y_RATIO = 0.6
+NAME_Y_RATIO = 0.44
 NAME_BASE_FONT_SIZE = 88
 
 
