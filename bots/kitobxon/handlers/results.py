@@ -290,6 +290,7 @@ async def generate_and_send_certificate(cb: CallbackQuery, session: AsyncSession
         full_name=full_name,
         score=result.final_score,
         total=result.total_questions,
+        include_total=False,
     )
     
     if not cert_bytes:
@@ -306,8 +307,7 @@ async def generate_and_send_certificate(cb: CallbackQuery, session: AsyncSession
         document=build_certificate_input_file(cert_bytes),
         caption=(
             f"🎖 <b>Sertifikat</b>\n\n"
-            f"Ism: {full_name}\n"
-            f"Ball: {result.final_score}/{result.total_questions}\n\n"
+            f"Ism: {full_name}\n\n"
             f"Tabriklaymiz! 🎉"
         ),
     )

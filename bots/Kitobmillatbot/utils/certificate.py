@@ -73,16 +73,18 @@ def generate_certificate(
     score: int,
     total: int,
     font_name: str = "DejaVuSans.ttf",
+    include_total: bool = True,
 ) -> io.BytesIO | None:
     """
     Generate a high-quality certificate PNG and return as BytesIO.
-    
+
     Features:
     - Adaptive font sizing based on name length
     - Proper name formatting (title case)
     - High-quality output
     - Better text rendering with anti-aliasing
-    
+    - Optionally hide the total score for cleaner output
+
     Returns None if template is not found.
     """
     try:
@@ -142,32 +144,33 @@ def generate_certificate(
             fill=(33, 33, 33, 255),
         )
 
-        # Score font
-        try:
-            score_font = ImageFont.truetype(font_path, size=40)
-        except (IOError, OSError):
-            score_font = ImageFont.load_default()
+if include_total:
+            # Score font
+            try:
+                score_font = ImageFont.truetype(font_path, size=40)
+            except (IOError, OSError):
+                score_font = ImageFont.load_default()
 
-        score_text = f"{score}/{total}"
-        score_bbox = draw.textbbox((0, 0), score_text, font=score_font)
-        score_w = score_bbox[2] - score_bbox[0]
-        score_x = (img_w - score_w) // 2
-        score_y = int(img_h * 0.62)
-        
-        # Draw score with shadow effect
-        draw.text(
-            (score_x + shadow_offset, score_y + shadow_offset),
-            score_text,
-            font=score_font,
-            fill=(200, 200, 200, 100),
-        )
-        # Main score text
-        draw.text(
-            (score_x, score_y),
-            score_text,
-            font=score_font,
-            fill=(80, 80, 80, 255),
-        )
+            score_text = f"{score}/{total}"
+            score_bbox = draw.textbbox((0, 0), score_text, font=score_font)
+            score_w = score_bbox[2] - score_bbox[0]
+            score_x = (img_w - score_w) // 2
+            score_y = int(img_h * 0.62)
+
+            # Draw score with shadow effect
+            draw.text(
+                (score_x + shadow_offset, score_y + shadow_offset),
+                score_text,
+                font=score_font,
+                fill=(200, 200, 200, 100),
+            )
+            # Main score text
+            draw.text(
+                (score_x, score_y),
+                score_text,
+                font=score_font,
+                fill=(80, 80, 80, 255),
+            )
 
         output = io.BytesIO()
         # Convert to RGB and save with high quality
