@@ -17,7 +17,8 @@ CERT_TEMPLATE = str(BASE_DIR / "certificates" / "template.png")
 ALT_CERT_TEMPLATE = str(Path(__file__).resolve().parents[1] / "certificate.png")
 FONT_DIR = str(BASE_DIR / "fonts")
 NAME_Y_RATIO = 0.44
-NAME_BASE_FONT_SIZE = 88
+NAME_BASE_FONT_SIZE = 100
+NAME_X_OFFSET = -100
 
 
 def resolve_certificate_template_path() -> str | None:
@@ -56,11 +57,15 @@ def _format_name_case(name: str) -> str:
     return " ".join(word.capitalize() for word in name.split())
 
 
-def get_name_layout(full_name: str, img_w: int, img_h: int) -> tuple[int, int]:
+def get_name_layout(full_name: str, img_w: int, img_h: int) -> tuple[int, int, int]:
     formatted_name = _format_name_case(full_name.strip())
-    font_size = _get_optimal_font_size(formatted_name, int(img_w * 0.8), base_size=NAME_BASE_FONT_SIZE)
+    font_size = _get_optimal_font_size(
+        formatted_name,
+        int(img_w * 0.8),
+        base_size=NAME_BASE_FONT_SIZE,
+    )
     name_y = int(img_h * NAME_Y_RATIO)
-    return font_size, name_y
+    return font_size, name_y, NAME_X_OFFSET
 
 
 def generate_certificate(
@@ -106,7 +111,7 @@ def generate_certificate(
         
         # Format name with proper case
         formatted_name = _format_name_case(full_name.strip())
-        name_font_size, name_y = get_name_layout(full_name, img_w, img_h)
+        name_font_size, name_y, name_x_offset = get_name_layout(full_name, img_w, img_h)
         
         # Name font
         try:
@@ -119,7 +124,7 @@ def generate_certificate(
         bbox = draw.textbbox((0, 0), formatted_name, font=name_font)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
-        name_x = (img_w - text_w) // 2
+        name_x = (img_w - text_w) // 2 + name_x_offset
 
         # Draw name with shadow effect for better quality
         shadow_offset = 2
