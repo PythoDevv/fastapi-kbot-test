@@ -16,7 +16,7 @@ BASE_DIR = Path(__file__).resolve().parents[3] / "static"
 CERT_TEMPLATE = str(BASE_DIR / "certificates" / "template.png")
 ALT_CERT_TEMPLATE = str(Path(__file__).resolve().parents[1] / "certificate.png")
 FONT_DIR = str(BASE_DIR / "fonts")
-NAME_Y_RATIO = 0.44
+NAME_Y_RATIO = 0.6
 NAME_BASE_FONT_SIZE = 88
 
 
@@ -39,7 +39,7 @@ def _get_optimal_font_size(text: str, max_width: int, base_size: int = 60) -> in
         from PIL import ImageFont
     except ImportError:
         return base_size
-    
+
     name_len = len(text)
     # Dynamically reduce font size for longer names
     if name_len > 20:
@@ -58,7 +58,7 @@ def _format_name_case(name: str) -> str:
 
 def get_name_layout(full_name: str, img_w: int, img_h: int) -> tuple[int, int]:
     formatted_name = _format_name_case(full_name.strip())
-    font_size = _get_optimal_font_size(formatted_name, int(img_w * 0.8), base_size=NAME_BASE_FONT_SIZE)
+    font_size = _get_optimal_font_size(formatted_name, int(img_w * 1.2), base_size=NAME_BASE_FONT_SIZE)
     name_y = int(img_h * NAME_Y_RATIO)
     return font_size, name_y
 
@@ -71,13 +71,13 @@ def generate_certificate(
 ) -> io.BytesIO | None:
     """
     Generate a high-quality certificate PNG and return as BytesIO.
-    
+
     Features:
     - Adaptive font sizing based on name length
     - Proper name formatting (title case)
     - High-quality output
     - Better text rendering with anti-aliasing
-    
+
     Returns None if template is not found.
     """
     try:
@@ -103,11 +103,11 @@ def generate_certificate(
         draw = ImageDraw.Draw(img, "RGBA")
 
         img_w, img_h = img.size
-        
+
         # Format name with proper case
         formatted_name = _format_name_case(full_name.strip())
         name_font_size, name_y = get_name_layout(full_name, img_w, img_h)
-        
+
         # Name font
         try:
             name_font = ImageFont.truetype(font_path, size=name_font_size)
@@ -148,7 +148,7 @@ def generate_certificate(
         score_w = score_bbox[2] - score_bbox[0]
         score_x = (img_w - score_w) // 2
         score_y = int(img_h * 0.62)
-        
+
         # Draw score with shadow effect
         draw.text(
             (score_x + shadow_offset, score_y + shadow_offset),
