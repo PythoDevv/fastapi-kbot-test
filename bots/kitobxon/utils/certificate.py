@@ -58,7 +58,7 @@ def _format_name_case(name: str) -> str:
 
 def get_name_layout(full_name: str, img_w: int, img_h: int) -> tuple[int, int]:
     formatted_name = _format_name_case(full_name.strip())
-    font_size = _get_optimal_font_size(formatted_name, int(img_w * 1.2), base_size=NAME_BASE_FONT_SIZE)
+    font_size = _get_optimal_font_size(formatted_name, int(img_w * 1.5), base_size=NAME_BASE_FONT_SIZE)
     name_y = int(img_h * NAME_Y_RATIO)
     return font_size, name_y
 
