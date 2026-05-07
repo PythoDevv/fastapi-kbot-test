@@ -1,6 +1,7 @@
 import io
 import os
 import tempfile
+from html import escape
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -29,6 +30,38 @@ def _format_completed_at(value) -> str:
     if value is None:
         return ""
     return value.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _format_duration_mm_ss(total_seconds: int | None) -> str:
+    total = max(int(total_seconds or 0), 0)
+    minutes, seconds = divmod(total, 60)
+    return f"{minutes:02d}:{seconds:02d}"
+
+
+def _build_top_30_text(rows: list[dict]) -> str:
+    sorted_rows = sorted(
+        rows,
+        key=lambda row: (
+            row.get("score") or 0,
+            row.get("session_id") or 0,
+        ),
+        reverse=True,
+    )
+
+    lines = ["<b>🏆 Top 30 test yechganlar</b>", ""]
+    for rank, row in enumerate(sorted_rows[:30], 1):
+        fio = escape(str(row.get("fio") or "Noma'lum"))
+        username_raw = str(row.get("username") or "").strip()
+        username = f"@{username_raw}" if username_raw else "-"
+        lines.append(
+            f"{rank}. ID: <code>{row.get('telegram_id') or '-'}</code> | "
+            f"Ism: {fio} | "
+            f"Username: <code>{escape(username)}</code> | "
+            f"Ball: {row.get('score') or 0} | "
+            f"Vaqt: {_format_duration_mm_ss(row.get('total_time_seconds'))}"
+        )
+
+    return "\n".join(lines)
 
 
 def _build_top_answers_rows(top_sessions: list[dict], answers_by_session: dict[int, list]) -> list[dict]:
@@ -219,6 +252,8 @@ async def export_test_results_summary(
     if not rows:
         await message.answer("Yakunlangan testlar topilmadi.")
         return
+
+    await message.answer(_build_top_30_text(rows))
 
     buf = export_test_results_summary_to_excel(rows)
     await message.answer_document(
