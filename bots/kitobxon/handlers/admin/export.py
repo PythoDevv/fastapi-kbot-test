@@ -16,12 +16,76 @@ from bots.kitobxon.states import AdminExportStates, AdminImportStates
 from bots.kitobxon.utils.excel import (
     export_answers_to_excel,
     export_referred_users_to_excel,
+    export_top_answers_to_excel,
     export_test_results_summary_to_excel,
     export_users_to_excel,
     import_users_from_excel,
 )
 
 router = Router(name="admin_export")
+
+
+def _format_completed_at(value) -> str:
+    if value is None:
+        return ""
+    return value.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _build_top_answers_rows(top_sessions: list[dict], answers_by_session: dict[int, list]) -> list[dict]:
+    rows: list[dict] = []
+
+    for rank, session_row in enumerate(top_sessions, 1):
+        session_answers = answers_by_session.get(session_row["session_id"], [])
+        correct_count = sum(1 for answer in session_answers if answer.is_correct)
+        timeout_count = sum(1 for answer in session_answers if answer.is_timeout)
+        incorrect_count = len(session_answers) - correct_count - timeout_count
+        total_time_seconds = sum(answer.time_taken_seconds for answer in session_answers)
+
+        base_row = {
+            "rank": rank,
+            "telegram_id": session_row["telegram_id"],
+            "fio": session_row.get("fio") or "",
+            "username": f"@{session_row['username']}" if session_row.get("username") else "",
+            "session_id": session_row["session_id"],
+            "score": session_row.get("score") or 0,
+            "total_questions": session_row.get("total_questions") or 0,
+            "correct_count": correct_count,
+            "incorrect_count": incorrect_count,
+            "timeout_count": timeout_count,
+            "total_time_seconds": total_time_seconds,
+            "completed_at": _format_completed_at(session_row.get("completed_at")),
+        }
+
+        if not session_answers:
+            rows.append(
+                {
+                    **base_row,
+                    "question_number": "",
+                    "question_text": "",
+                    "selected_answer": "",
+                    "correct_answer": "",
+                    "result": "",
+                    "timeout": "",
+                    "question_time_seconds": "",
+                }
+            )
+            continue
+
+        for answer in session_answers:
+            rows.append(
+                {
+                    **base_row,
+                    "question_number": answer.question_index + 1,
+                    "question_text": answer.question_text or "",
+                    "selected_answer": answer.selected_answer or "",
+                    "correct_answer": answer.correct_answer or "",
+                    "result": "To'g'ri" if answer.is_correct else "Noto'g'ri",
+                    "timeout": "Ha" if answer.is_timeout else "Yo'q",
+                    "question_time_seconds": answer.time_taken_seconds,
+                }
+            )
+
+    return rows
 
 
 async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
@@ -160,6 +224,32 @@ async def export_test_results_summary(
     await message.answer_document(
         document=BufferedInputFile(buf.read(), filename="test_statistikasi.xlsx"),
         caption=f"Jami: {len(rows)} ta yakunlangan test statistikasi",
+    )
+
+
+@router.message(F.text == "🏆 Top 30 javoblar")
+async def export_top_answers(
+    message: Message, session: AsyncSession
+) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+
+    quiz_repo = QuizRepository(session)
+    top_sessions = await quiz_repo.get_top_latest_completed_sessions(limit=30)
+    if not top_sessions:
+        await message.answer("Top 30 uchun yakunlangan testlar topilmadi.")
+        return
+
+    answers_by_session = {
+        row["session_id"]: await quiz_repo.get_session_answers(row["session_id"])
+        for row in top_sessions
+    }
+    export_rows = _build_top_answers_rows(top_sessions, answers_by_session)
+    buf = export_top_answers_to_excel(export_rows)
+
+    await message.answer_document(
+        document=BufferedInputFile(buf.read(), filename="top_30_javoblar.xlsx"),
+        caption=f"Top 30 bo'yicha {len(top_sessions)} ta foydalanuvchi javoblari eksport qilindi.",
     )
 
 

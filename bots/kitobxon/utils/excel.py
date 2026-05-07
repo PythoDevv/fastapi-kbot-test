@@ -222,6 +222,80 @@ def export_test_results_summary_to_excel(rows: list[dict[str, Any]]) -> io.Bytes
     return buf
 
 
+def export_top_answers_to_excel(rows: list[dict[str, Any]]) -> io.BytesIO:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Top 30 javoblar"
+
+    headers = [
+        "Rank",
+        "Telegram ID",
+        "FIO",
+        "Username",
+        "Session ID",
+        "Umumiy ball",
+        "Jami savol",
+        "To'g'ri soni",
+        "Noto'g'ri soni",
+        "Timeout soni",
+        "Umumiy vaqt (s)",
+        "Yakunlangan vaqt",
+        "Savol №",
+        "Savol matni",
+        "Tanlangan javob",
+        "To'g'ri javob",
+        "Natija",
+        "Timeout",
+        "Savolga ketgan vaqt (s)",
+    ]
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(fill_type="solid", fgColor="2E4057")
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    ws.row_dimensions[1].height = 30
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+
+    for row_idx, row in enumerate(rows, 2):
+        for col_idx, key in enumerate(
+            [
+                "rank",
+                "telegram_id",
+                "fio",
+                "username",
+                "session_id",
+                "score",
+                "total_questions",
+                "correct_count",
+                "incorrect_count",
+                "timeout_count",
+                "total_time_seconds",
+                "completed_at",
+                "question_number",
+                "question_text",
+                "selected_answer",
+                "correct_answer",
+                "result",
+                "timeout",
+                "question_time_seconds",
+            ],
+            1,
+        ):
+            ws.cell(row=row_idx, column=col_idx, value=row.get(key, ""))
+
+    col_widths = [8, 16, 28, 20, 12, 12, 12, 12, 14, 12, 16, 20, 10, 50, 28, 28, 12, 10, 18]
+    for col_idx, width in enumerate(col_widths, 1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
 def generate_questions_template() -> tuple[io.BytesIO, str]:
     """Generate template file for questions import (.xlsx with example row)"""
     wb = openpyxl.Workbook()
