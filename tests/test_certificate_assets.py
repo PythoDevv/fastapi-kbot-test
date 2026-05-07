@@ -36,6 +36,18 @@ class CertificateAssetResolutionTests(unittest.TestCase):
 
         self.assertEqual(module.resolve_certificate_template_path(), module.ALT_CERT_TEMPLATE)
 
+    def test_kitobxon_builds_buffered_input_file_for_telegram(self) -> None:
+        module = _import_certificate_module("bots.kitobxon.utils.certificate")
+        payload = module.build_certificate_input_file(module.io.BytesIO(b"abc"))
+
+        self.assertEqual(payload.filename, "certificate.png")
+
+    def test_kitobmillatbot_builds_buffered_input_file_for_telegram(self) -> None:
+        module = _import_certificate_module("bots.Kitobmillatbot.utils.certificate")
+        payload = module.build_certificate_input_file(module.io.BytesIO(b"abc"))
+
+        self.assertEqual(payload.filename, "certificate.png")
+
 
 if __name__ == "__main__":
     unittest.main()

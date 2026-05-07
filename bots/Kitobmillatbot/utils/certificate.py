@@ -7,6 +7,7 @@ import io
 import os
 from pathlib import Path
 
+from aiogram.types import BufferedInputFile
 from core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -23,6 +24,11 @@ def resolve_certificate_template_path() -> str | None:
         if os.path.exists(candidate):
             return candidate
     return None
+
+
+def build_certificate_input_file(buffer: io.BytesIO, filename: str = "certificate.png") -> BufferedInputFile:
+    buffer.seek(0)
+    return BufferedInputFile(buffer.read(), filename=filename)
 
 
 def _get_optimal_font_size(text: str, max_width: int, base_size: int = 60) -> int:

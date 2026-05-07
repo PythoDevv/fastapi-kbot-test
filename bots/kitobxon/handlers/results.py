@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.kitobxon.keyboards import inline
 from bots.kitobxon.services import ResultsService
-from bots.kitobxon.utils.certificate import generate_certificate
+from bots.kitobxon.utils.certificate import build_certificate_input_file, generate_certificate
 
 router = Router(name="results")
 
@@ -302,9 +302,8 @@ async def generate_and_send_certificate(cb: CallbackQuery, session: AsyncSession
         await session.flush()
     
     # Send certificate
-    cert_bytes.seek(0)
     await cb.message.answer_document(
-        document=cert_bytes,
+        document=build_certificate_input_file(cert_bytes),
         caption=(
             f"🎖 <b>Sertifikat</b>\n\n"
             f"Ism: {full_name}\n"
