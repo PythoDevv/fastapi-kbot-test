@@ -50,17 +50,19 @@ class CertificateAssetResolutionTests(unittest.TestCase):
 
     def test_kitobxon_name_layout_moves_up_and_gets_bigger(self) -> None:
         module = _import_certificate_module("bots.kitobxon.utils.certificate")
-        font_size, name_y = module.get_name_layout("Ilyos", 3508, 2480)
+        font_size, name_y, name_x_offset = module.get_name_layout("Ilyos", 3508, 2480)
 
-        self.assertEqual(font_size, 88)
+        self.assertEqual(font_size, 100)
         self.assertEqual(name_y, int(2480 * 0.44))
+        self.assertEqual(name_x_offset, -100)
 
     def test_kitobmillatbot_name_layout_moves_up_and_gets_bigger(self) -> None:
         module = _import_certificate_module("bots.Kitobmillatbot.utils.certificate")
-        font_size, name_y = module.get_name_layout("Ilyos", 3508, 2480)
+        font_size, name_y, name_x_offset = module.get_name_layout("Ilyos", 3508, 2480)
 
-        self.assertEqual(font_size, 88)
+        self.assertEqual(font_size, 100)
         self.assertEqual(name_y, int(2480 * 0.44))
+        self.assertEqual(name_x_offset, -100)
 
 
 if __name__ == "__main__":
