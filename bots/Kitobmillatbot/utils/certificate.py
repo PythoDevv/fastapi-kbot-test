@@ -16,6 +16,8 @@ BASE_DIR = Path(__file__).resolve().parents[3] / "static"
 CERT_TEMPLATE = str(BASE_DIR / "certificates" / "template.png")
 ALT_CERT_TEMPLATE = str(Path(__file__).resolve().parents[1] / "certificate.png")
 FONT_DIR = str(BASE_DIR / "fonts")
+NAME_Y_RATIO = 0.44
+NAME_BASE_FONT_SIZE = 88
 
 
 def resolve_certificate_template_path() -> str | None:
@@ -52,6 +54,13 @@ def _get_optimal_font_size(text: str, max_width: int, base_size: int = 60) -> in
 def _format_name_case(name: str) -> str:
     """Format name with proper case handling (capitalize first letter of each word)"""
     return " ".join(word.capitalize() for word in name.split())
+
+
+def get_name_layout(full_name: str, img_w: int, img_h: int) -> tuple[int, int]:
+    formatted_name = _format_name_case(full_name.strip())
+    font_size = _get_optimal_font_size(formatted_name, int(img_w * 0.8), base_size=NAME_BASE_FONT_SIZE)
+    name_y = int(img_h * NAME_Y_RATIO)
+    return font_size, name_y
 
 
 def generate_certificate(
@@ -97,9 +106,7 @@ def generate_certificate(
         
         # Format name with proper case
         formatted_name = _format_name_case(full_name.strip())
-        
-        # Calculate optimal name font size based on name length
-        name_font_size = _get_optimal_font_size(formatted_name, int(img_w * 0.8))
+        name_font_size, name_y = get_name_layout(full_name, img_w, img_h)
         
         # Name font
         try:
@@ -113,8 +120,7 @@ def generate_certificate(
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
         name_x = (img_w - text_w) // 2
-        name_y = int(img_h * 0.50)
-        
+
         # Draw name with shadow effect for better quality
         shadow_offset = 2
         draw.text(
