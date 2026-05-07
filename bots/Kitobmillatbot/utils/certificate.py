@@ -144,7 +144,7 @@ def generate_certificate(
             fill=(33, 33, 33, 255),
         )
 
-if include_total:
+        if include_total:
             # Score font
             try:
                 score_font = ImageFont.truetype(font_path, size=40)
