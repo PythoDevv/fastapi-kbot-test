@@ -55,7 +55,9 @@
       "Bash(python3 -c \"import aiogram; print\\(aiogram.__version__\\)\")",
       "Read(//root/web_app_kbot/venv/lib/python3.11/**)",
       "Bash(python3 -c \"from aiogram.types import Message; print\\([x for x in dir\\(Message\\) if 'html' in x.lower\\(\\) or 'caption' in x.lower\\(\\)]\\)\")",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(systemctl list-units *)",
+      "Read(//etc/systemd/system/**)"
     ],
     "additionalDirectories": [
       "/tmp"

@@ -93,7 +93,7 @@ class ZayafkaChannel(Base, TimestampMixin):
 class UserZayafkaChannel(Base):
     __tablename__ = t("user_zayafka_channels")
     __table_args__ = (
-        UniqueConstraint("user_id", "zayafka_channel_id", name="uq_user_zayafka"),
+        UniqueConstraint("user_id", "zayafka_channel_id", name="uq_kitobmillatbot_user_zayafka"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

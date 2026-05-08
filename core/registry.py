@@ -1,3 +1,5 @@
+import asyncio
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -15,6 +17,8 @@ from core.middleware import DbSessionMiddleware, LoggingMiddleware
 
 logger = get_logger(__name__)
 
+_SEEN_UPDATES_MAX = 4096
+
 
 @dataclass
 class BotConfig:
@@ -29,6 +33,8 @@ class BotConfig:
 class BotRegistry:
     def __init__(self) -> None:
         self._bots: dict[str, tuple[Bot, Dispatcher, BotConfig]] = {}
+        self._seen_updates: dict[str, OrderedDict[int, None]] = {}
+        self._tasks: set[asyncio.Task] = set()
 
     def register(self, app: FastAPI, config: BotConfig) -> None:
         if config.name in self._bots:
@@ -49,8 +55,24 @@ class BotRegistry:
         dp.include_router(config.router)
 
         self._bots[config.name] = (bot, dp, config)
+        self._seen_updates[config.name] = OrderedDict()
         self._attach_webhook_route(app, bot, dp, config)
         logger.info("Registered bot '%s' at %s", config.name, config.webhook_path)
+
+    def _is_duplicate(self, bot_name: str, update_id: int) -> bool:
+        seen = self._seen_updates[bot_name]
+        if update_id in seen:
+            return True
+        seen[update_id] = None
+        if len(seen) > _SEEN_UPDATES_MAX:
+            seen.popitem(last=False)
+        return False
+
+    async def _process_update(self, bot: Bot, dp: Dispatcher, update: Update, bot_name: str) -> None:
+        try:
+            await dp.feed_update(bot, update)
+        except Exception:
+            logger.exception("Update %s failed for bot %s", update.update_id, bot_name)
 
     def _attach_webhook_route(
         self,
@@ -75,7 +97,12 @@ class BotRegistry:
             except Exception:
                 logger.exception("Invalid update payload for bot %s", config.name)
                 raise HTTPException(status_code=400, detail="invalid update")
-            await dp.feed_update(bot, update)
+            if self._is_duplicate(config.name, update.update_id):
+                logger.info("Duplicate update %s for bot %s — skipped", update.update_id, config.name)
+                return {"ok": True}
+            task = asyncio.create_task(self._process_update(bot, dp, update, config.name))
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
             return {"ok": True}
 
         webhook_endpoint.__name__ = f"webhook_{config.name}"
@@ -84,7 +111,6 @@ class BotRegistry:
         )
 
     async def set_webhooks(self) -> None:
-        import asyncio
         for name, (bot, _dp, config) in self._bots.items():
             url = f"{settings.BASE_WEBHOOK_URL.rstrip('/')}{config.webhook_path}"
             max_retries = 3

@@ -199,6 +199,7 @@ async def back_to_results(cb: CallbackQuery, session: AsyncSession) -> None:
         await cb.message.edit_text(parts[0], reply_markup=inline.results_main_keyboard())
         for part in parts[1:]:
             await cb.message.answer(part)
+    await cb.answer()
 
 
 @router.message(F.text == "🎖 Mening sertifikatim")

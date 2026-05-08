@@ -72,13 +72,14 @@ async def cmd_start(
         first_name=message.from_user.first_name,
     )
 
-    # Parse referral — save to FSM data so it survives the subscription gate
+    # Parse referral and persist to DB immediately so it survives any
+    # subsequent state.clear() or /start re-invocation without referral arg.
     args = message.text.split(maxsplit=1)
     if len(args) > 1 and not result.user.is_registered and not result.user.referred_by:
         try:
             referrer_id = int(args[1])
             if referrer_id != message.from_user.id:
-                await state.update_data(pending_referrer_id=referrer_id)
+                await auth.apply_referral(result.user, referrer_id)
         except ValueError:
             pass
 
@@ -94,12 +95,6 @@ async def cmd_start(
                 ),
             )
             return
-
-    # Apply pending referral before continuing
-    fsm_data = await state.get_data()
-    pending_referrer_id = fsm_data.get("pending_referrer_id")
-    if pending_referrer_id and not result.user.referred_by:
-        await auth.apply_referral(result.user, pending_referrer_id)
 
     is_registered = await _continue_after_subscription(
         message,
@@ -146,12 +141,6 @@ async def check_subscription(
     if status.all_subscribed:
         await cb.message.delete()
 
-        # Apply pending referral that was stored before the subscription gate
-        fsm_data = await state.get_data()
-        pending_referrer_id = fsm_data.get("pending_referrer_id")
-        if pending_referrer_id and not result.user.referred_by:
-            await auth.apply_referral(result.user, pending_referrer_id)
-
         is_registered = await _continue_after_subscription(
             cb.message,
             state,
@@ -168,6 +157,7 @@ async def check_subscription(
                     "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
                     f"Referallar soni: <b>{referrer_referrals}</b>",
                 )
+        await cb.answer()
     else:
         text = _subscription_prompt_text(True)
         markup = inline.subscription_keyboard(

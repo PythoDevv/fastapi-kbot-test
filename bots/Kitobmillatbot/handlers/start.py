@@ -72,14 +72,16 @@ async def cmd_start(
         first_name=message.from_user.first_name,
     )
 
-    # Parse referral
+    # Parse referral and persist to DB immediately so it survives any
+    # subsequent state.clear() or /start re-invocation without referral arg.
     args = message.text.split(maxsplit=1)
-    if len(args) > 1 and not result.user.is_registered:
+    if len(args) > 1 and not result.user.is_registered and not result.user.referred_by:
         try:
             referrer_id = int(args[1])
+        except ValueError:
+            referrer_id = None
+        if referrer_id and referrer_id != message.from_user.id:
             await auth.apply_referral(result.user, referrer_id)
-        except (ValueError, Exception):
-            pass
 
     # Adminlar uchun obuna tekshiruvi yo'q
     if not result.user.is_admin:
@@ -154,6 +156,7 @@ async def check_subscription(
                     "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
                     f"Referallar soni: <b>{referrer_referrals}</b>",
                 )
+        await cb.answer()
     else:
         text = _subscription_prompt_text(True)
         markup = inline.subscription_keyboard(
