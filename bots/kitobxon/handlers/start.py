@@ -9,7 +9,7 @@ from bots.kitobxon.keyboards import inline, reply
 from bots.kitobxon.models import User
 from bots.kitobxon.repositories import QuizRepository
 from bots.kitobxon.services import AuthService, SubsService
-from bots.kitobxon.states import AuthStates, PendingReferral
+from bots.kitobxon.states import AuthStates
 from core.logging import get_logger
 
 logger = get_logger(__name__)

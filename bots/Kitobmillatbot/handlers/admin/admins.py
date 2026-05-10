@@ -49,7 +49,7 @@ async def show_admin_list(message_or_cb, session: AsyncSession, is_callback: boo
         await message_or_cb.answer(text, reply_markup=keyboard)
 
 
-@router.message(F.text == "👥 Adminlar")
+@router.message(F.text == reply.ADMIN_BUTTON_ADMINS)
 async def show_admins(message: Message, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
