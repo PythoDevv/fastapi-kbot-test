@@ -243,9 +243,9 @@ def results_main_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="📊 Testim", callback_data="res_test"),
                 InlineKeyboardButton(text="👥 Referallarim", callback_data="res_referral"),
             ],
-            [
-                InlineKeyboardButton(text="🎖 Sertifikatim", callback_data="res_certificate"),
-            ]
+            # [
+            #     InlineKeyboardButton(text="🎖 Sertifikatim", callback_data="res_certificate"),
+            # ]
         ]
     )
 

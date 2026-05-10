@@ -105,7 +105,7 @@ async def _show_referral_preview(
     if include_link:
         reply_markup = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="🔗 Referal havola", url=link)]
+                [InlineKeyboardButton(text="👉 Tanlovda ishtirob etish 👈", url=link)]
             ]
         )
 

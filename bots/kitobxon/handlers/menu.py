@@ -70,7 +70,7 @@ async def referral_link(message: Message, session: AsyncSession) -> None:
     if not contents:
         reply_markup = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="🔗 Referal havola", url=link)]
+                [InlineKeyboardButton(text="👉 Tanlovda ishtirob etish 👈", url=link)]
             ]
         )
         await message.answer(link, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
@@ -88,7 +88,7 @@ async def referral_link(message: Message, session: AsyncSession) -> None:
         if content.require_link:
             reply_markup = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="🔗 Referal havola", url=link)]
+                    [InlineKeyboardButton(text="👉 Tanlovda ishtirob etish 👈", url=link)]
                 ]
             )
 
@@ -180,3 +180,9 @@ async def show_prizes(message: Message, session: AsyncSession) -> None:
             content.text or "Sovg'alar haqida ma'lumot.",
             parse_mode=ParseMode.HTML,
         )
+
+
+@router.message(Command("people"))
+async def show_user_count(message: Message, session: AsyncSession) -> None:
+    user_count = await UserRepository(session).count()
+    await message.answer(f"Bot foydalanuvchilar soni: {user_count} 👥")
