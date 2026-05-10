@@ -206,16 +206,16 @@ async def cancel_content_message(
 async def save_content_message(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
-    if not message.text and not message.photo:
-        await message.answer("Iltimos, matn yoki rasm yuboring.")
+    if not (message.text or message.caption or message.photo or message.document):
+        await message.answer("Iltimos, matn, rasm yoki fayl yuboring.")
         return
 
     data = await state.get_data()
     service = AdminService(session)
     image_id = message.photo[-1].file_id if message.photo else None
     text = _as_html(
-        message.caption if message.photo else message.text,
-        message.caption_entities if message.photo else message.entities,
+        message.caption if (message.photo or message.document) else message.text,
+        message.caption_entities if (message.photo or message.document) else message.entities,
     )
 
     if data["action"] == "waiting_post":
