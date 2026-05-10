@@ -15,15 +15,43 @@ depends_on = None
 
 def upgrade() -> None:
     # Old constraint name "uq_user_zayafka" clashed with kitobxon's identical
-    # constraint when both schemas live in the same Postgres database.
+    # constraint when both bots share the same database.
     op.execute(
-        "ALTER TABLE kitobmillatbot_user_zayafka_channels "
-        "RENAME CONSTRAINT uq_user_zayafka TO uq_kitobmillatbot_user_zayafka"
+        """
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1
+                FROM pg_constraint c
+                JOIN pg_class t ON c.conrelid = t.oid
+                WHERE c.conname = 'uq_user_zayafka'
+                  AND t.relname = 'kitobmillatbot_user_zayafka_channels'
+            ) THEN
+                ALTER TABLE kitobmillatbot_user_zayafka_channels
+                RENAME CONSTRAINT uq_user_zayafka TO uq_kitobmillatbot_user_zayafka;
+            END IF;
+        END;
+        $$;
+        """
     )
 
 
 def downgrade() -> None:
     op.execute(
-        "ALTER TABLE kitobmillatbot_user_zayafka_channels "
-        "RENAME CONSTRAINT uq_kitobmillatbot_user_zayafka TO uq_user_zayafka"
+        """
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1
+                FROM pg_constraint c
+                JOIN pg_class t ON c.conrelid = t.oid
+                WHERE c.conname = 'uq_kitobmillatbot_user_zayafka'
+                  AND t.relname = 'kitobmillatbot_user_zayafka_channels'
+            ) THEN
+                ALTER TABLE kitobmillatbot_user_zayafka_channels
+                RENAME CONSTRAINT uq_kitobmillatbot_user_zayafka TO uq_user_zayafka;
+            END IF;
+        END;
+        $$;
+        """
     )

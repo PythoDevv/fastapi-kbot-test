@@ -303,7 +303,7 @@ def upgrade() -> None:
         sa.UniqueConstraint(
             "user_id",
             "zayafka_channel_id",
-            name="uq_user_zayafka",
+            name="uq_kitobmillatbot_user_zayafka",
         ),
     )
     op.create_table(
