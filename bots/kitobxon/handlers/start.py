@@ -16,6 +16,13 @@ logger = get_logger(__name__)
 router = Router(name="start")
 
 
+async def _safe_delete(message: Message) -> None:
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
+
+
 def _subscription_prompt_text(has_missing: bool) -> str:
     if has_missing:
         return "Quyidagi kanallarga hali obuna bo'lmadingiz:"
@@ -125,7 +132,7 @@ async def check_subscription(
         first_name=cb.from_user.first_name,
     )
     if result.user.is_admin:
-        await cb.message.delete()
+        await _safe_delete(cb.message)
         await _continue_after_subscription(
             cb.message,
             state,
@@ -139,7 +146,7 @@ async def check_subscription(
     status = await subs.check_user(bot, cb.from_user.id, result.user.id)
 
     if status.all_subscribed:
-        await cb.message.delete()
+        await _safe_delete(cb.message)
 
         is_registered = await _continue_after_subscription(
             cb.message,
