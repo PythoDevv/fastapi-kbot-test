@@ -129,9 +129,14 @@ async def show_referral_results(cb: CallbackQuery, session: AsyncSession) -> Non
             user_count = entry.user.referrals_count
             break
 
+    if user_count is None:
+        current_user = await service.users.get_by_telegram_id(cb.from_user.id)
+        if current_user is not None:
+            user_count = current_user.referrals_count or 0
+
     lines = ["<b>👥 Referallar</b>\n"]
 
-    if user_count is not None:
+    if user_count:
         lines.append(f"Siz taklif qilgansiz: <b>{user_count} kishi</b>\n")
     else:
         lines.append("Siz taklif qilmagan edingiz.\n")
