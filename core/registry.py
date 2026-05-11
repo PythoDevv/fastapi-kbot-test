@@ -142,6 +142,17 @@ class BotRegistry:
                         logger.exception("Failed to set webhook for '%s' after %d attempts", name, max_retries)
 
     async def close_all(self) -> None:
+        if self._tasks:
+            logger.info("Waiting for %d in-flight updates to finish...", len(self._tasks))
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*self._tasks, return_exceptions=True),
+                    timeout=10.0,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Timeout waiting for in-flight updates; cancelling remaining")
+                for task in list(self._tasks):
+                    task.cancel()
         for name, (bot, _dp, _cfg) in self._bots.items():
             try:
                 await bot.session.close()

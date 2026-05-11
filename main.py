@@ -101,5 +101,5 @@ if __name__ == "__main__":
         host=settings.SERVER_HOST,
         port=settings.SERVER_PORT,
         workers=1,
-        reload=True,
+        reload=False,
     )
