@@ -3,9 +3,9 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bots.kitobxon.keyboards import inline
-from bots.kitobxon.services import ResultsService
-from bots.kitobxon.utils.certificate import build_certificate_input_file, generate_certificate
+from bots.Millatchiroqlaribot.keyboards import inline
+from bots.Millatchiroqlaribot.services import ResultsService
+from bots.Millatchiroqlaribot.utils.certificate import build_certificate_input_file, generate_certificate
 
 router = Router(name="results")
 
@@ -275,7 +275,7 @@ async def show_certificate_from_results(cb: CallbackQuery, session: AsyncSession
 @router.callback_query(F.data == "cert_generate")
 async def generate_and_send_certificate(cb: CallbackQuery, session: AsyncSession) -> None:
     """Generate and send certificate to user"""
-    from bots.kitobxon.repositories import UserRepository
+    from bots.Millatchiroqlaribot.repositories import UserRepository
     
     user_repo = UserRepository(session)
     user = await user_repo.get_by_telegram_id(cb.from_user.id)

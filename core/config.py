@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     KITOBMILLATBOT_BOT_TOKEN: str = ""
     KITOBMILLATBOT_ADMIN_IDS: list[int] = Field(default_factory=lambda: [935795577])
     KITOBMILLATBOT_WEBHOOK_PATH: str = "/kitobmillatbot/webhook"
+
+    MILLATCHIROQLARIBOT_BOT_TOKEN: str = ""
+    MILLATCHIROQLARIBOT_ADMIN_IDS: list[int] = Field(default_factory=lambda: [935795577])
+    MILLATCHIROQLARIBOT_WEBHOOK_PATH: str = "/millatchiroqlaribot/webhook"
     WEBAPP_JWT_SECRET: str = "change-me-webapp-jwt-secret-32chars"
     WEBAPP_JWT_TTL_SECONDS: int = 60 * 60 * 5
 

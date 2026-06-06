@@ -1,3 +1,4 @@
+import asyncio
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Document, Message
@@ -39,7 +40,7 @@ async def export_questions(cb: CallbackQuery, session: AsyncSession) -> None:
         return
     from bots.Kitobmillatbot.utils.excel import export_questions_to_excel
     questions = await AdminService(session).list_questions()
-    buf = export_questions_to_excel(questions)
+    buf = await asyncio.to_thread(export_questions_to_excel, questions)
     await cb.message.answer_document(
         document=BufferedInputFile(buf.read(), filename="savollar.xlsx"),
         caption=f"Jami: {len(questions)} savol",
@@ -54,7 +55,7 @@ async def export_questions_message(message: Message, session: AsyncSession) -> N
     from bots.Kitobmillatbot.utils.excel import export_questions_to_excel
 
     questions = await AdminService(session).list_questions()
-    buf = export_questions_to_excel(questions)
+    buf = await asyncio.to_thread(export_questions_to_excel, questions)
     await message.answer_document(
         document=BufferedInputFile(buf.read(), filename="savollar.xlsx"),
         caption=f"Jami: {len(questions)} savol",
@@ -299,7 +300,7 @@ async def import_questions_excel(
         await bot.download_file(file.file_path, tmp.name)
         tmp_path = tmp.name
     try:
-        questions, errors = import_questions_from_excel(tmp_path)
+        questions, errors = await asyncio.to_thread(import_questions_from_excel, tmp_path)
         added = 0
         service = AdminService(session)
         for q in questions:

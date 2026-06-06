@@ -1,3 +1,4 @@
+import asyncio
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -292,7 +293,8 @@ async def generate_and_send_certificate(cb: CallbackQuery, session: AsyncSession
     
     # Generate certificate
     full_name = user.fio or user.username or f"User {user.telegram_id}"
-    cert_bytes = generate_certificate(
+    cert_bytes = await asyncio.to_thread(
+        generate_certificate,
         full_name=full_name,
         score=result.final_score,
         total=result.total_questions,

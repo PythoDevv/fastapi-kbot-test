@@ -6,8 +6,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, PollAnswer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bots.Kitobmillatbot.config import QuizType
-from bots.Kitobmillatbot.exceptions import (
+from bots.Millatchiroqlaribot.config import QuizType
+from bots.Millatchiroqlaribot.exceptions import (
     AlreadySolvedError,
     KitobxonError,
     QuizAlreadyStartedError,
@@ -16,10 +16,10 @@ from bots.Kitobmillatbot.exceptions import (
     QuizWaitingError,
     SubscriptionRequiredError,
 )
-from bots.Kitobmillatbot.keyboards import inline, reply
-from bots.Kitobmillatbot.services import QuizService, SubsService
-from bots.Kitobmillatbot.services.quiz_service import QuestionPayload
-from bots.Kitobmillatbot.states import QuizStates
+from bots.Millatchiroqlaribot.keyboards import inline, reply
+from bots.Millatchiroqlaribot.services import QuizService, SubsService
+from bots.Millatchiroqlaribot.services.quiz_service import QuestionPayload
+from bots.Millatchiroqlaribot.states import QuizStates
 from core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -249,7 +249,7 @@ def _schedule_timeout_poll(
 async def start_quiz(
     message: Message, state: FSMContext, session: AsyncSession, bot: Bot
 ) -> None:
-    from bots.Kitobmillatbot.repositories import UserRepository
+    from bots.Millatchiroqlaribot.repositories import UserRepository
     user_repo = UserRepository(session)
     user = await user_repo.get_by_telegram_id(message.from_user.id)
     if not user or not user.is_registered:
@@ -324,7 +324,7 @@ async def start_quiz(
 
         if session_quiz_type == QuizType.WEBAPP:
             from core.config import settings as app_settings
-            webapp_url = f"{app_settings.BASE_WEBHOOK_URL.rstrip('/')}/kitobmillatbot/webapp/"
+            webapp_url = f"{app_settings.BASE_WEBHOOK_URL.rstrip('/')}/millatchiroqlaribot/webapp/"
             await message.answer(
                 "Testni davom ettirish uchun quyidagi tugmani bosing:",
                 reply_markup=inline.webapp_quiz_keyboard(webapp_url),
@@ -373,7 +373,7 @@ async def start_quiz(
 
     if result.quiz_type == QuizType.WEBAPP:
         from core.config import settings as app_settings
-        webapp_url = f"{app_settings.BASE_WEBHOOK_URL.rstrip('/')}/kitobmillatbot/webapp/"
+        webapp_url = f"{app_settings.BASE_WEBHOOK_URL.rstrip('/')}/millatchiroqlaribot/webapp/"
         await message.answer(
             "Testni boshlash uchun quyidagi tugmani bosing:",
             reply_markup=inline.webapp_quiz_keyboard(webapp_url),

@@ -1,3 +1,4 @@
+import asyncio
 import io
 import os
 import tempfile
@@ -139,7 +140,7 @@ async def export_users(message: Message, session: AsyncSession) -> None:
     )
     users = users_result.scalars().all()
 
-    buf = export_users_to_excel(users)
+    buf = await asyncio.to_thread(export_users_to_excel, users)
     await message.answer_document(
         document=BufferedInputFile(buf.read(), filename="users.xlsx"),
         caption=f"Jami: {len(users)} foydalanuvchi",
@@ -181,7 +182,7 @@ async def export_referred_users(
         return
 
     referred_users = await repo.list_referred_users(telegram_id)
-    buf = export_referred_users_to_excel(owner, referred_users)
+    buf = await asyncio.to_thread(export_referred_users_to_excel, owner, referred_users)
     await state.clear()
     await message.answer_document(
         document=BufferedInputFile(buf.read(), filename=f"taklif_qilinganlar_{telegram_id}.xlsx"),
@@ -231,7 +232,7 @@ async def export_user_answers(
         return
 
     answers = await quiz_repo.get_session_answers(completed_session.id)
-    buf = export_answers_to_excel(user, completed_session, answers)
+    buf = await asyncio.to_thread(export_answers_to_excel, user, completed_session, answers)
     await state.clear()
     await message.answer_document(
         document=BufferedInputFile(buf.read(), filename=f"javoblar_{telegram_id}.xlsx"),
@@ -255,7 +256,7 @@ async def export_test_results_summary(
 
     await message.answer(_build_top_30_text(rows))
 
-    buf = export_test_results_summary_to_excel(rows)
+    buf = await asyncio.to_thread(export_test_results_summary_to_excel, rows)
     await message.answer_document(
         document=BufferedInputFile(buf.read(), filename="test_statistikasi.xlsx"),
         caption=f"Jami: {len(rows)} ta yakunlangan test statistikasi",
@@ -280,7 +281,7 @@ async def export_top_answers(
         for row in top_sessions
     }
     export_rows = _build_top_answers_rows(top_sessions, answers_by_session)
-    buf = export_top_answers_to_excel(export_rows)
+    buf = await asyncio.to_thread(export_top_answers_to_excel, export_rows)
 
     await message.answer_document(
         document=BufferedInputFile(buf.read(), filename="top_30_javoblar.xlsx"),

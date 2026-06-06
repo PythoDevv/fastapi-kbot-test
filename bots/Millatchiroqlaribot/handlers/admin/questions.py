@@ -4,9 +4,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Document, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bots.kitobxon.keyboards import inline, reply
-from bots.kitobxon.services import AdminService
-from bots.kitobxon.states import AdminQuestionStates, AdminQuestionImportStates
+from bots.Millatchiroqlaribot.keyboards import inline, reply
+from bots.Millatchiroqlaribot.services import AdminService
+from bots.Millatchiroqlaribot.states import AdminQuestionStates, AdminQuestionImportStates
 from core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -16,7 +16,7 @@ router = Router(name="admin_questions")
 async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
     if telegram_id == 935795577:
         return True
-    from bots.kitobxon.repositories import UserRepository
+    from bots.Millatchiroqlaribot.repositories import UserRepository
     user = await UserRepository(session).get_by_telegram_id(telegram_id)
     return bool(user and user.is_admin)
 
@@ -38,7 +38,7 @@ async def export_questions(cb: CallbackQuery, session: AsyncSession) -> None:
     if not await _is_admin(session, cb.from_user.id):
         await cb.answer()
         return
-    from bots.kitobxon.utils.excel import export_questions_to_excel
+    from bots.Millatchiroqlaribot.utils.excel import export_questions_to_excel
     questions = await AdminService(session).list_questions()
     buf = await asyncio.to_thread(export_questions_to_excel, questions)
     await cb.message.answer_document(
@@ -52,7 +52,7 @@ async def export_questions(cb: CallbackQuery, session: AsyncSession) -> None:
 async def export_questions_message(message: Message, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
-    from bots.kitobxon.utils.excel import export_questions_to_excel
+    from bots.Millatchiroqlaribot.utils.excel import export_questions_to_excel
 
     questions = await AdminService(session).list_questions()
     buf = await asyncio.to_thread(export_questions_to_excel, questions)
@@ -82,7 +82,7 @@ async def download_template(cb: CallbackQuery, session: AsyncSession) -> None:
     if not await _is_admin(session, cb.from_user.id):
         await cb.answer()
         return
-    from bots.kitobxon.utils.excel import generate_questions_template
+    from bots.Millatchiroqlaribot.utils.excel import generate_questions_template
     buf, ext = generate_questions_template()
     await cb.message.answer_document(
         document=BufferedInputFile(buf.read(), filename=f"savollar_namuna.{ext}"),
@@ -95,7 +95,7 @@ async def download_template(cb: CallbackQuery, session: AsyncSession) -> None:
 async def download_template_message(message: Message, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
-    from bots.kitobxon.utils.excel import generate_questions_template
+    from bots.Millatchiroqlaribot.utils.excel import generate_questions_template
 
     buf, ext = generate_questions_template()
     await message.answer_document(
@@ -288,7 +288,7 @@ async def import_questions_excel(
 ) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
-    from bots.kitobxon.utils.excel import import_questions_from_excel
+    from bots.Millatchiroqlaribot.utils.excel import import_questions_from_excel
     import tempfile, os
 
     # Determine file extension from document name

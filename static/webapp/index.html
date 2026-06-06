@@ -213,7 +213,9 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-const BASE = '';  // same origin
+// Derive API base from this page's own path so each bot hits its own backend.
+// Page is served at e.g. /millatchiroqlaribot/webapp/ -> base /millatchiroqlaribot/webapp
+const API_BASE = window.location.pathname.replace(/\/+$/, '');
 let token = null;
 let sessionId = null;
 let currentIndex = 0;
@@ -225,7 +227,7 @@ let selectedOption = null;
 let answering = false;
 
 async function api(path, body) {
-  const res = await fetch(BASE + '/webapp' + path, {
+  const res = await fetch(API_BASE + path, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

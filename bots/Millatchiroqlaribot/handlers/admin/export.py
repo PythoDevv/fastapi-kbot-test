@@ -10,12 +10,12 @@ from aiogram.types import BufferedInputFile, Document, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bots.Kitobmillatbot.keyboards import reply
-from bots.Kitobmillatbot.models import User
-from bots.Kitobmillatbot.repositories import QuizRepository, UserRepository
-from bots.Kitobmillatbot.services import AdminService
-from bots.Kitobmillatbot.states import AdminExportStates, AdminImportStates
-from bots.Kitobmillatbot.utils.excel import (
+from bots.Millatchiroqlaribot.keyboards import reply
+from bots.Millatchiroqlaribot.models import User
+from bots.Millatchiroqlaribot.repositories import QuizRepository, UserRepository
+from bots.Millatchiroqlaribot.services import AdminService
+from bots.Millatchiroqlaribot.states import AdminExportStates, AdminImportStates
+from bots.Millatchiroqlaribot.utils.excel import (
     export_answers_to_excel,
     export_referred_users_to_excel,
     export_top_answers_to_excel,
