@@ -203,13 +203,24 @@ async def set_referral_reason(
     reason = reason_text if reason_text != "-" else None
     service = AdminService(session)
     caller = await service.find_user(message.from_user.id)
-    user = await service.set_referral_count(
-        admin_telegram_id=message.from_user.id,
-        admin_fio=caller.fio if caller else None,
-        target_telegram_id=data["target_telegram_id"],
-        new_count=data["new_count"],
-        reason=reason,
-    )
+    try:
+        user = await service.set_referral_count(
+            admin_telegram_id=message.from_user.id,
+            admin_fio=caller.fio if caller else None,
+            target_telegram_id=data["target_telegram_id"],
+            new_count=data["new_count"],
+            reason=reason,
+        )
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        await state.clear()
+        await message.answer(
+            "Referallar saqlanmadi — xatolik yuz berdi. Iltimos, qayta urinib ko'ring.",
+            reply_markup=reply.admin_panel(),
+        )
+        raise
+    await session.refresh(user)
     await state.clear()
     await message.answer(
         f"Referallar o'zgartirildi.\n{user.fio} → {user.referrals_count} referallar",

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sqlalchemy import delete, desc, func, select, update
+from sqlalchemy import delete, desc, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from bots.Millatchiroqlaribot.models import User
@@ -96,6 +96,21 @@ class UserRepository(BaseRepository[User]):
             .limit(limit)
         )
         return list((await self.session.execute(stmt)).scalars().all())
+
+    async def referral_rank(self, telegram_id: int) -> int | None:
+        user = await self.get_by_telegram_id(telegram_id)
+        if user is None or not user.is_registered:
+            return None
+
+        stmt = select(func.count(User.id)).where(
+            User.is_registered.is_(True),
+            or_(
+                User.referrals_count > user.referrals_count,
+                (User.referrals_count == user.referrals_count) & (User.id < user.id),
+            ),
+        )
+        users_before = int((await self.session.execute(stmt)).scalar_one() or 0)
+        return users_before + 1
 
     async def all_registered_ids(self) -> list[int]:
         stmt = select(User.telegram_id).where(User.is_registered.is_(True))

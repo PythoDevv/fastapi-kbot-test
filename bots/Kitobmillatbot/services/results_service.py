@@ -16,13 +16,6 @@ class RatingEntry:
 
 
 @dataclass
-class LeaderboardUser:
-    telegram_id: int
-    fio: str | None
-    username: str | None
-
-
-@dataclass
 class UserResult:
     user: User
     final_score: int
@@ -80,28 +73,13 @@ class ResultsService:
     async def top_test_takers(
         self, telegram_id: int, limit: int = 30
     ) -> list[RatingEntry]:
-        rows = await self.quiz.get_top_latest_completed_sessions(limit)
-        entries: list[RatingEntry] = []
-        for i, row in enumerate(rows):
-            entries.append(
-                RatingEntry(
-                    rank=i + 1,
-                    user=LeaderboardUser(
-                        telegram_id=row["telegram_id"],
-                        fio=row.get("fio"),
-                        username=row.get("username"),
-                    ),
-                    is_current=row["telegram_id"] == telegram_id,
-                    value=int(row.get("score") or 0),
-                )
-            )
-        return entries
+        return await self.top_by_score(telegram_id, limit)
 
     async def top_by_referrals(
         self, telegram_id: int, limit: int = 10
     ) -> list[RatingEntry]:
         top = await self.users.top_by_referrals(limit)
-        return [
+        entries = [
             RatingEntry(
                 rank=i + 1,
                 user=u,
@@ -110,6 +88,24 @@ class ResultsService:
             )
             for i, u in enumerate(top)
         ]
+        if any(entry.is_current for entry in entries):
+            return entries
+
+        current_user = await self.users.get_by_telegram_id(telegram_id)
+        if current_user is None or not current_user.is_registered:
+            return entries
+
+        rank = await self.users.referral_rank(telegram_id)
+        if rank is not None:
+            entries.append(
+                RatingEntry(
+                    rank=rank,
+                    user=current_user,
+                    is_current=True,
+                    value=current_user.referrals_count or 0,
+                )
+            )
+        return entries
 
     async def get_detailed_test_result(self, telegram_id: int) -> DetailedTestResult | None:
         user = await self.users.get_by_telegram_id(telegram_id)
