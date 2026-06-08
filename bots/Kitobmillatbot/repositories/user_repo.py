@@ -52,12 +52,32 @@ class UserRepository(BaseRepository[User]):
             update(User).where(User.id == user_id).values(score=User.score + delta)
         )
 
-    async def increment_referrals(self, user_id: int, delta: int = 1) -> None:
-        await self.session.execute(
+    async def increment_referrals(self, user_id: int, delta: int = 1) -> int:
+        """Atomically increment and return the new referral count."""
+        result = await self.session.execute(
             update(User)
             .where(User.id == user_id)
             .values(referrals_count=User.referrals_count + delta)
+            .returning(User.referrals_count)
         )
+        return int(result.scalar_one())
+
+    async def claim_referral_bonus(self, telegram_id: int) -> bool:
+        """Atomically mark the referral bonus as awarded.
+
+        Returns True only for the transaction that flips the flag from False,
+        so concurrent duplicate updates (double-tap, webhook redelivery) can
+        never award the same user twice.
+        """
+        result = await self.session.execute(
+            update(User)
+            .where(
+                User.telegram_id == telegram_id,
+                User.referral_bonus_awarded.is_(False),
+            )
+            .values(referral_bonus_awarded=True)
+        )
+        return result.rowcount == 1
 
     async def top_by_score(self, limit: int = 10) -> list[User]:
         stmt = (

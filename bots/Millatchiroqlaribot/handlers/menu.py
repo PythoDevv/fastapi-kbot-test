@@ -56,7 +56,7 @@ async def back_to_menu(
 async def change_name(message: Message, state: FSMContext) -> None:
     await state.set_state(AuthStates.changing_name)
     await message.answer(
-        "Yangi ism familiyangizni kiriting:", reply_markup=reply.cancel_only()
+        "Yangi oila nomini kiriting:", reply_markup=reply.cancel_only()
     )
 
 

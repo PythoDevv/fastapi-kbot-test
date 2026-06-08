@@ -117,13 +117,26 @@ async def set_score_reason(
     reason = reason_text if reason_text != "-" else None
     service = AdminService(session)
     caller = await service.find_user(message.from_user.id)
-    user = await service.set_score(
-        admin_telegram_id=message.from_user.id,
-        admin_fio=caller.fio if caller else None,
-        target_telegram_id=data["target_telegram_id"],
-        new_score=data["new_score"],
-        reason=reason,
-    )
+    try:
+        user = await service.set_score(
+            admin_telegram_id=message.from_user.id,
+            admin_fio=caller.fio if caller else None,
+            target_telegram_id=data["target_telegram_id"],
+            new_score=data["new_score"],
+            reason=reason,
+        )
+        # Persist before confirming, so a commit failure surfaces as an error
+        # instead of a false "saved" message followed by a silent revert.
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        await state.clear()
+        await message.answer(
+            "Ball saqlanmadi — xatolik yuz berdi. Iltimos, qayta urinib ko'ring.",
+            reply_markup=reply.admin_panel(),
+        )
+        raise
+    await session.refresh(user)
     await state.clear()
     await message.answer(
         f"Ball o'zgartirildi.\n{user.fio} → {user.score} ball",

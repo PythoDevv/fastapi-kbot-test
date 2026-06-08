@@ -12,6 +12,13 @@ class RegistrationResult:
     is_new: bool
 
 
+@dataclass
+class ReferralAward:
+    referrer_telegram_id: int
+    referrals_count: int
+    new_user_name: str
+
+
 class AuthService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -70,14 +77,18 @@ class AuthService:
 
     async def award_referral_bonus_if_eligible(
         self, telegram_id: int
-    ) -> tuple[int, int] | None:
+    ) -> ReferralAward | None:
         """Award referral bonus exactly once and increment referral count.
 
-        Returns (referrer_telegram_id, referrer_referrals_count) when awarded,
-        otherwise None.
+        Returns a ReferralAward (referrer telegram id, fresh referral count and
+        the new user's registered name) when awarded, otherwise None.
         """
         user = await self.users.get_by_telegram_id(telegram_id)
-        if not user or not user.referred_by or user.referral_bonus_awarded:
+        if not user or not user.referred_by:
+            return None
+
+        # Atomically claim the bonus; only the first concurrent caller wins.
+        if not await self.users.claim_referral_bonus(telegram_id):
             return None
 
         referrer = await self.users.get_by_telegram_id(user.referred_by)
@@ -85,9 +96,6 @@ class AuthService:
             return None
 
         await self.users.increment_score(referrer.id, 1)
-        await self.users.increment_referrals(referrer.id, 1)
-        await self.users.update_fields(telegram_id, referral_bonus_awarded=True)
-        await self.session.flush()
-        updated_referrer = await self.users.get_by_telegram_id(referrer.telegram_id)
-        assert updated_referrer is not None
-        return referrer.telegram_id, updated_referrer.referrals_count
+        new_count = await self.users.increment_referrals(referrer.id, 1)
+        new_user_name = user.fio or user.username or "Foydalanuvchi"
+        return ReferralAward(referrer.telegram_id, new_count, new_user_name)

@@ -110,14 +110,13 @@ async def cmd_start(
         result.user,
     )
     if is_registered:
-        referral_result = await auth.award_referral_bonus_if_eligible(message.from_user.id)
-        if referral_result:
-            referrer_id, referrer_referrals = referral_result
+        award = await auth.award_referral_bonus_if_eligible(message.from_user.id)
+        if award:
             await bot.send_message(
-                referrer_id,
-                f"{result.user.fio or result.user.username or message.from_user.first_name} "
+                award.referrer_telegram_id,
+                f"{award.new_user_name} "
                 "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
-                f"Referallar soni: <b>{referrer_referrals}</b>",
+                f"Referallar soni: <b>{award.referrals_count}</b>",
             )
 
 
@@ -155,14 +154,13 @@ async def check_subscription(
             result.user,
         )
         if is_registered:
-            referral_result = await auth.award_referral_bonus_if_eligible(cb.from_user.id)
-            if referral_result:
-                referrer_id, referrer_referrals = referral_result
+            award = await auth.award_referral_bonus_if_eligible(cb.from_user.id)
+            if award:
                 await bot.send_message(
-                    referrer_id,
-                    f"{result.user.fio or result.user.username or cb.from_user.first_name} "
+                    award.referrer_telegram_id,
+                    f"{award.new_user_name} "
                     "sizning referalingiz orqali ro'yxatdan o'tdi.\n"
-                    f"Referallar soni: <b>{referrer_referrals}</b>",
+                    f"Referallar soni: <b>{award.referrals_count}</b>",
                 )
         await cb.answer()
     else:
