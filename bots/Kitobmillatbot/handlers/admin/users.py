@@ -1,4 +1,5 @@
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +15,35 @@ from bots.Kitobmillatbot.states import (
 
 router = Router(name="admin_users")
 MAX_REASONABLE_REFERRAL_COUNT = 1_000_000
+
+
+def _user_info_text(user) -> str:
+    info = "<b>👤 Foydalanuvchi:</b>\n"
+    info += f"ID: <code>{user.telegram_id}</code>\n"
+    info += f"Ism: {user.fio or '-'}\n"
+    info += f"Username: @{user.username or '-'}\n"
+    info += f"Ball: <b>{user.score}</b>\n"
+    info += f"Referallar: <b>{user.referrals_count}</b>\n"
+    admin_status = "✅ Ha" if user.is_admin else "❌ Yoq"
+    info += f"Admin: {admin_status}"
+    return info
+
+
+async def _refresh_user_card(message: Message, state_data: dict, user) -> None:
+    chat_id = state_data.get("user_card_chat_id")
+    message_id = state_data.get("user_card_message_id")
+    if not chat_id or not message_id:
+        return
+
+    try:
+        await message.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=_user_info_text(user),
+            reply_markup=inline.user_action_keyboard(user.telegram_id, user.is_admin),
+        )
+    except TelegramBadRequest:
+        pass
 
 
 async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
@@ -54,17 +84,10 @@ async def search_user(
         await message.answer("Foydalanuvchi topilmadi.")
         return
 
-    # Show user info and action buttons
-    info = f"<b>👤 Foydalanuvchi:</b>\n"
-    info += f"ID: <code>{user.telegram_id}</code>\n"
-    info += f"Ism: {user.fio or '-'}\n"
-    info += f"Username: @{user.username or '-'}\n"
-    info += f"Ball: <b>{user.score}</b>\n"
-    info += f"Referallar: <b>{user.referrals_count}</b>\n"
-    admin_status = "✅ Ha" if user.is_admin else "❌ Yoq"
-    info += f"Admin: {admin_status}"
-
-    await message.answer(info, reply_markup=inline.user_action_keyboard(telegram_id, user.is_admin))
+    await message.answer(
+        _user_info_text(user),
+        reply_markup=inline.user_action_keyboard(telegram_id, user.is_admin),
+    )
 
 
 @router.callback_query(F.data.startswith("u_score:"))
@@ -75,8 +98,13 @@ async def start_score_change(
         await cb.answer()
         return
     target_id = int(cb.data.split(":")[1])
+    await state.clear()
     await state.set_state(AdminScoreStates.waiting_new_score)
-    await state.update_data(target_telegram_id=target_id)
+    await state.update_data(
+        target_telegram_id=target_id,
+        user_card_chat_id=cb.message.chat.id,
+        user_card_message_id=cb.message.message_id,
+    )
     await cb.message.answer(
         f"ID {target_id} uchun yangi ball kiriting:", reply_markup=reply.cancel_only()
     )
@@ -137,6 +165,7 @@ async def set_score_reason(
         )
         raise
     await session.refresh(user)
+    await _refresh_user_card(message, data, user)
     await state.clear()
     await message.answer(
         f"Ball o'zgartirildi.\n{user.fio} → {user.score} ball",
