@@ -22,7 +22,7 @@ _NON_NAME_TEXTS = {
     "📝 Tanlov shartlari",
     "Tanlov kitoblari 📚",
     "Viktorina sovg'alari 🎁",
-    "Ismni o'zgartirish ✏️",
+    "Oila nomini o'zgartirish ✏️",
     "🏠 Asosiy menyu",
     "🔙 Admin panel",
 }

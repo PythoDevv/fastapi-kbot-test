@@ -20,7 +20,7 @@ def main_menu() -> ReplyKeyboardMarkup:
                 # KeyboardButton(text="🎖 Mening sertifikatim"),
                 KeyboardButton(text="Viktorina sovg'alari 🎁"),
             ],
-            [KeyboardButton(text="Ismni o'zgartirish ✏️")],
+            [KeyboardButton(text="Oila nomini o'zgartirish ✏️")],
         ],
         resize_keyboard=True,
     )
