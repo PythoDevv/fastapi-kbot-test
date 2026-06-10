@@ -9,35 +9,43 @@ class UserNotFoundError(KitobxonError):
 
 
 class UserNotRegisteredError(KitobxonError):
-    pass
+    def __init__(self, message: str = "Avval ro'yxatdan o'ting."):
+        super().__init__(message)
 
 
 class QuizAlreadyStartedError(KitobxonError):
-    pass
+    def __init__(self, message: str = "Sizda faol test mavjud."):
+        super().__init__(message)
 
 
 class QuizNotActiveError(KitobxonError):
-    pass
+    def __init__(self, message: str = "Test hozircha faol emas. Iltimos keyinroq urinib ko'ring."):
+        super().__init__(message)
 
 
 class QuizFinishedError(KitobxonError):
-    pass
+    def __init__(self, message: str = "Test yakunlandi."):
+        super().__init__(message)
 
 
 class QuizWaitingError(KitobxonError):
-    pass
+    def __init__(self, message: str = "Test hali boshlanmagan. Kuting."):
+        super().__init__(message)
 
 
 class SubscriptionRequiredError(KitobxonError):
-    pass
+    def __init__(self, message: str = "Avval kanallarga obuna bo'ling."):
+        super().__init__(message)
 
 
 class NoQuestionsError(KitobxonError):
-    pass
+    def __init__(self, message: str = "Hozircha savollar mavjud emas. Admin savol qo'shishi kerak."):
+        super().__init__(message)
 
 
 class AlreadySolvedError(KitobxonError):
-    pass
+    def __init__(self, message: str = "Siz testni allaqachon yakunladingiz."):
+        super().__init__(message)
 
 
 class QuestionDeletionBlockedError(KitobxonError):
