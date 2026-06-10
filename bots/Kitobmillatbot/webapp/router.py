@@ -168,7 +168,7 @@ async def submit_answer(
         try:
             await _get_bot().send_message(
                 telegram_id,
-                "🧑‍💻 WebApp test yakunlandi.\n\n"
+                "📊 Test natijalari.\n\n"
                 f"Natija: <b>{result.score}/{result.total_questions}</b>\n"
                 f"Sarflagan vaqt: <b>{_format_total_time(result.total_time_seconds)}</b>",
             )
