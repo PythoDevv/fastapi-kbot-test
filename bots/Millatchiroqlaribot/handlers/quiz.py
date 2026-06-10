@@ -368,8 +368,11 @@ async def start_quiz(
                 time_limit=settings.time_limit_seconds,
             )
         return
+    except QuizNotActiveError:
+        await message.answer("Test hozircha faol emas. Iltimos keyinroq urinib ko'ring.")
+        return
     except KitobxonError as e:
-        await message.answer(str(e))
+        await message.answer(str(e) or "Xatolik yuz berdi. Iltimos qayta urinib ko'ring.")
         return
 
     # New session started
