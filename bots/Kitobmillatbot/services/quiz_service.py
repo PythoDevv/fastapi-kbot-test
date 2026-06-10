@@ -98,20 +98,17 @@ class QuizService:
         self,
         telegram_id: int,
         *,
+        ignore_user_state: bool = False,
         ignore_availability: bool = False,
+        replace_active_if_type_changed: bool = False,
     ) -> StartResult:
         user = await self.users.get_by_telegram_id(telegram_id)
         if user is None:
             raise UserNotFoundError(telegram_id)
-        if not user.is_registered:
+        if not ignore_user_state and not user.is_registered:
             raise UserNotRegisteredError()
-        if user.test_solved:
+        if not ignore_user_state and user.test_solved:
             raise AlreadySolvedError()
-
-        await self.quiz.acquire_quiz_lock(user.id)
-
-        if await self.quiz.has_active_session(user.id):
-            raise QuizAlreadyStartedError()
 
         if ignore_availability:
             settings = await self.quiz.get_settings()
@@ -123,6 +120,24 @@ class QuizService:
                 raise QuizWaitingError()
             if settings.finished:
                 raise QuizFinishedError()
+
+        await self.quiz.acquire_quiz_lock(user.id)
+
+        active_session = await self.quiz.get_active_session(user.id)
+        if active_session is not None:
+            active_quiz_type = getattr(active_session, "quiz_type", None)
+            if active_quiz_type is None:
+                _, active_quiz_type = self.quiz.decode_session_questions(
+                    active_session.questions_json
+                )
+            if (
+                replace_active_if_type_changed
+                and active_quiz_type is not None
+                and active_quiz_type != settings.quiz_type
+            ):
+                await self.quiz.complete_session(active_session.id)
+            else:
+                raise QuizAlreadyStartedError()
 
         available_questions = await self.quiz.count_questions()
         question_limit = min(settings.questions_per_test, available_questions)

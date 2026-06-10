@@ -42,12 +42,17 @@ class FakeUsers:
 
 
 class FakeQuiz:
+    def __init__(self, rows):
+        self.rows = rows
+        self.top_latest_completed_sessions_calls = 0
+
     async def get_top_latest_completed_sessions(self, limit):
-        raise AssertionError("Score leaderboard must use users.score, not test sessions")
+        self.top_latest_completed_sessions_calls += 1
+        return self.rows[:limit]
 
 
 @pytest.mark.parametrize("bot", BOTS)
-def test_results_leaderboard_uses_user_score(bot):
+def test_results_leaderboard_uses_latest_completed_test_sessions(bot):
     module = importlib.import_module(f"bots.{bot}.services.results_service")
     service = module.ResultsService.__new__(module.ResultsService)
     service.users = FakeUsers(
@@ -56,13 +61,30 @@ def test_results_leaderboard_uses_user_score(bot):
             SimpleNamespace(telegram_id=222, fio="Ali", username="ali", score=80),
         ]
     )
-    service.quiz = FakeQuiz()
+    service.quiz = FakeQuiz(
+        [
+            {
+                "telegram_id": 935795577,
+                "fio": "Ilyos",
+                "username": "ilyosbek_kv",
+                "score": 17,
+            },
+            {
+                "telegram_id": 222,
+                "fio": "Ali",
+                "username": "ali",
+                "score": 12,
+            },
+        ]
+    )
 
     entries = asyncio.run(service.top_test_takers(935795577, limit=30))
 
-    assert service.users.top_by_score_calls == 1
+    assert service.users.top_by_score_calls == 0
+    assert service.quiz.top_latest_completed_sessions_calls == 1
     assert entries[0].is_current is True
-    assert entries[0].value == 101
+    assert entries[0].value == 17
+    assert entries[0].user.fio == "Ilyos"
 
 
 @pytest.mark.parametrize("bot", BOTS)
@@ -94,7 +116,7 @@ def test_referral_leaderboard_appends_current_user_outside_limit(bot):
             )
         ]
     )
-    service.quiz = FakeQuiz()
+    service.quiz = FakeQuiz([])
 
     entries = asyncio.run(service.top_by_referrals(935795577, limit=30))
 

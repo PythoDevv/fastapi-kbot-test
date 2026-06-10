@@ -1,4 +1,5 @@
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,6 +44,23 @@ def _format_settings_text(settings_obj) -> str:
     )
 
 
+async def _safe_edit_settings_message(cb: CallbackQuery, settings_obj) -> None:
+    try:
+        await cb.message.edit_text(
+            _format_settings_text(settings_obj),
+            reply_markup=inline.quiz_settings_full_keyboard(
+                settings_obj.active,
+                settings_obj.waiting,
+                settings_obj.finished,
+                _require_phone_enabled(settings_obj),
+                settings_obj.quiz_type.value,
+            )
+        )
+    except TelegramBadRequest as exc:
+        if "message is not modified" not in str(exc):
+            raise
+
+
 @router.message(F.text == "⚙️ Test sozlamalari")
 async def show_settings(message: Message, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
@@ -82,16 +100,7 @@ async def toggle_quiz_status(cb: CallbackQuery, session: AsyncSession) -> None:
         await cb.answer("Test to'xtatildi (waiting mode).")
 
     s = await service.get_settings()
-    await cb.message.edit_text(
-        _format_settings_text(s),
-        reply_markup=inline.quiz_settings_full_keyboard(
-            s.active,
-            s.waiting,
-            s.finished,
-            _require_phone_enabled(s),
-            s.quiz_type.value,
-        )
-    )
+    await _safe_edit_settings_message(cb, s)
 
 
 @router.callback_query(F.data.startswith("qt:"))
@@ -106,18 +115,13 @@ async def set_quiz_type(cb: CallbackQuery, session: AsyncSession) -> None:
         await cb.answer("Noto'g'ri tur.")
         return
     service = AdminService(session)
+    current_settings = await service.get_settings()
+    if current_settings.quiz_type == quiz_type:
+        await cb.answer(f"Test turi allaqachon: {quiz_type.value.upper()}", show_alert=False)
+        return
     await service.set_quiz_type(quiz_type)
     s = await service.get_settings()
-    await cb.message.edit_text(
-        _format_settings_text(s),
-        reply_markup=inline.quiz_settings_full_keyboard(
-            s.active,
-            s.waiting,
-            s.finished,
-            _require_phone_enabled(s),
-            s.quiz_type.value,
-        )
-    )
+    await _safe_edit_settings_message(cb, s)
     await cb.answer(f"Test turi: {quiz_type.value.upper()}", show_alert=True)
 
 
@@ -157,13 +161,4 @@ async def toggle_phone_setting(cb: CallbackQuery, session: AsyncSession) -> None
     s = await service.get_settings()
     phone_status = "✅ Talab" if _require_phone_enabled(s) else "❌ Ixtiyoriy"
     await cb.answer(f"Telefon: {phone_status}")
-    await cb.message.edit_text(
-        _format_settings_text(s),
-        reply_markup=inline.quiz_settings_full_keyboard(
-            s.active,
-            s.waiting,
-            s.finished,
-            _require_phone_enabled(s),
-            s.quiz_type.value,
-        )
-    )
+    await _safe_edit_settings_message(cb, s)

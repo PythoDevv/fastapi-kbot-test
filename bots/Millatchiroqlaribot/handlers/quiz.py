@@ -252,12 +252,17 @@ async def start_quiz(
     from bots.Millatchiroqlaribot.repositories import UserRepository
     user_repo = UserRepository(session)
     user = await user_repo.get_by_telegram_id(message.from_user.id)
-    if not user or not user.is_registered:
+    if not user:
+        await message.answer("Foydalanuvchi topilmadi.")
+        return
+
+    is_admin = bool(user.is_admin)
+    if not is_admin and not user.is_registered:
         await message.answer("Avval ro'yxatdan o'ting.")
         return
 
     referral_count = user.referrals_count or 0
-    if not user.is_admin and referral_count < MIN_CONFIRMED_REFERRALS_TO_START:
+    if not is_admin and referral_count < MIN_CONFIRMED_REFERRALS_TO_START:
         remaining = MIN_CONFIRMED_REFERRALS_TO_START - referral_count
         await message.answer(
             "Testni ishlash uchun kamida "
@@ -268,7 +273,7 @@ async def start_quiz(
         return
 
     # Adminlar uchun obuna tekshiruvi yo'q
-    if not user.is_admin:
+    if not is_admin:
         subs = SubsService(session)
         status = await subs.check_user(bot, message.from_user.id, user.id)
         if not status.all_subscribed:
@@ -285,7 +290,9 @@ async def start_quiz(
     try:
         result = await service.start_session(
             message.from_user.id,
-            ignore_availability=user.is_admin,
+            ignore_user_state=is_admin,
+            ignore_availability=is_admin,
+            replace_active_if_type_changed=is_admin,
         )
     except QuizWaitingError:
         settings = await service.quiz.get_settings()

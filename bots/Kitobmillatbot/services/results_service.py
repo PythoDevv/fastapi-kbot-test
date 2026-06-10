@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,7 +74,20 @@ class ResultsService:
     async def top_test_takers(
         self, telegram_id: int, limit: int = 30
     ) -> list[RatingEntry]:
-        return await self.top_by_score(telegram_id, limit)
+        top_sessions = await self.quiz.get_top_latest_completed_sessions(limit)
+        return [
+            RatingEntry(
+                rank=index,
+                user=SimpleNamespace(
+                    telegram_id=row["telegram_id"],
+                    fio=row.get("fio"),
+                    username=row.get("username"),
+                ),
+                is_current=row["telegram_id"] == telegram_id,
+                value=int(row.get("score") or 0),
+            )
+            for index, row in enumerate(top_sessions, start=1)
+        ]
 
     async def top_by_referrals(
         self, telegram_id: int, limit: int = 10
