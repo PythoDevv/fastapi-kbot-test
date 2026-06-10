@@ -46,6 +46,34 @@ sudo journalctl -u kbot -f
 
 Eslatma: webhook rejimida `aiogram` FSM `MemoryStorage` bilan ishlayotgani uchun servis `1 worker` bilan ko'tarilishi kerak. Aks holda `Userlarni import`, kanal qo'shish, savol qo'shish kabi state'li oqimlar workerlar orasida yo'qolib qolishi mumkin.
 
+### Botlarni alohida rejimda boshqarish
+
+Har bir bot uchun `.env` da mode berish mumkin:
+
+```bash
+KITOBXON_MODE=webhook
+KITOBMILLATBOT_MODE=webhook
+MILLATCHIROQLARIBOT_MODE=webhook
+```
+
+Ruxsat etilgan qiymatlar:
+
+- `webhook` — `main.py` startup vaqtida webhook set qiladi
+- `polling` — `main.py` bu botni webhookka qo'shmaydi
+- `disabled` — vaqtincha o'chirib qo'yadi
+
+Mode'larni bitta komanda bilan almashtirish:
+
+```bash
+python3 manage_bot_modes.py kitobmillatbot=webhook kitobxon=polling millatchiroqlaribot=polling
+```
+
+Joriy holatni ko'rish:
+
+```bash
+python3 manage_bot_modes.py show
+```
+
 ### Polling fallback (konkurs paytida webhook qotganda)
 
 ```bash
@@ -59,6 +87,13 @@ python main_polling.py
 # Qayta webhook rejimga o'tish
 # Ctrl+C bilan polling to'xtatiladi
 sudo systemctl start kbot
+```
+
+`MODE=polling` deb belgilangan barcha botlarni birga ishga tushirish:
+
+```bash
+source venv/bin/activate
+python3 main_polling_selected.py
 ```
 
 ## Yangi bot qo'shish

@@ -283,7 +283,10 @@ async def start_quiz(
     service = QuizService(session)
     result = None
     try:
-        result = await service.start_session(message.from_user.id)
+        result = await service.start_session(
+            message.from_user.id,
+            ignore_availability=user.is_admin,
+        )
     except QuizWaitingError:
         settings = await service.quiz.get_settings()
         text = settings.waiting_text or "Test hali boshlanmagan. Kuting."

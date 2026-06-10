@@ -94,7 +94,12 @@ class QuizService:
         return await self.start_session(telegram_id)
 
     # ---------- Start ----------
-    async def start_session(self, telegram_id: int) -> StartResult:
+    async def start_session(
+        self,
+        telegram_id: int,
+        *,
+        ignore_availability: bool = False,
+    ) -> StartResult:
         user = await self.users.get_by_telegram_id(telegram_id)
         if user is None:
             raise UserNotFoundError(telegram_id)
@@ -108,11 +113,16 @@ class QuizService:
         if await self.quiz.has_active_session(user.id):
             raise QuizAlreadyStartedError()
 
-        settings = await self.get_settings()
-        if settings.waiting:
-            raise QuizWaitingError()
-        if settings.finished:
-            raise QuizFinishedError()
+        if ignore_availability:
+            settings = await self.quiz.get_settings()
+            if settings is None:
+                raise QuizNotActiveError("Quiz sozlamalari topilmadi")
+        else:
+            settings = await self.get_settings()
+            if settings.waiting:
+                raise QuizWaitingError()
+            if settings.finished:
+                raise QuizFinishedError()
 
         available_questions = await self.quiz.count_questions()
         question_limit = min(settings.questions_per_test, available_questions)

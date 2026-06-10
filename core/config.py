@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field, PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -24,14 +25,17 @@ class Settings(BaseSettings):
     KITOBXON_BOT_TOKEN: str
     KITOBXON_ADMIN_IDS: list[int] = Field(default_factory=lambda: [935795577])
     KITOBXON_WEBHOOK_PATH: str = "/kitobxon/webhook"
+    KITOBXON_MODE: Literal["webhook", "polling", "disabled"] = "webhook"
 
     KITOBMILLATBOT_BOT_TOKEN: str = ""
     KITOBMILLATBOT_ADMIN_IDS: list[int] = Field(default_factory=lambda: [935795577])
     KITOBMILLATBOT_WEBHOOK_PATH: str = "/kitobmillatbot/webhook"
+    KITOBMILLATBOT_MODE: Literal["webhook", "polling", "disabled"] = "webhook"
 
     MILLATCHIROQLARIBOT_BOT_TOKEN: str = ""
     MILLATCHIROQLARIBOT_ADMIN_IDS: list[int] = Field(default_factory=lambda: [935795577])
     MILLATCHIROQLARIBOT_WEBHOOK_PATH: str = "/millatchiroqlaribot/webhook"
+    MILLATCHIROQLARIBOT_MODE: Literal["webhook", "polling", "disabled"] = "webhook"
     WEBAPP_JWT_SECRET: str = "change-me-webapp-jwt-secret-32chars"
     WEBAPP_JWT_TTL_SECONDS: int = 60 * 60 * 5
 

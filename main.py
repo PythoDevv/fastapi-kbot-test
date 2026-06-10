@@ -28,24 +28,31 @@ logger = get_logger(__name__)
 registry = BotRegistry()
 
 
+def _uses_webhook(mode: str) -> bool:
+    return mode == "webhook"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting up kbot_and_test_solve...")
 
     # Register kitobxon bot
-    registry.register(
-        app,
-        BotConfig(
-            name="kitobxon",
-            token=settings.KITOBXON_BOT_TOKEN,
-            webhook_path=settings.KITOBXON_WEBHOOK_PATH,
-            router=build_kitobxon_router(),
-            admin_ids=settings.KITOBXON_ADMIN_IDS,
-        ),
-    )
+    if _uses_webhook(settings.KITOBXON_MODE):
+        registry.register(
+            app,
+            BotConfig(
+                name="kitobxon",
+                token=settings.KITOBXON_BOT_TOKEN,
+                webhook_path=settings.KITOBXON_WEBHOOK_PATH,
+                router=build_kitobxon_router(),
+                admin_ids=settings.KITOBXON_ADMIN_IDS,
+            ),
+        )
+    else:
+        logger.info("Skipping webhook for 'kitobxon' because mode=%s", settings.KITOBXON_MODE)
 
     # Register kitobmillatbot
-    if settings.KITOBMILLATBOT_BOT_TOKEN:
+    if settings.KITOBMILLATBOT_BOT_TOKEN and _uses_webhook(settings.KITOBMILLATBOT_MODE):
         registry.register(
             app,
             BotConfig(
@@ -56,9 +63,14 @@ async def lifespan(app: FastAPI):
                 admin_ids=settings.KITOBMILLATBOT_ADMIN_IDS,
             ),
         )
+    elif settings.KITOBMILLATBOT_BOT_TOKEN:
+        logger.info(
+            "Skipping webhook for 'kitobmillatbot' because mode=%s",
+            settings.KITOBMILLATBOT_MODE,
+        )
 
     # Register millatchiroqlaribot
-    if settings.MILLATCHIROQLARIBOT_BOT_TOKEN:
+    if settings.MILLATCHIROQLARIBOT_BOT_TOKEN and _uses_webhook(settings.MILLATCHIROQLARIBOT_MODE):
         registry.register(
             app,
             BotConfig(
@@ -68,6 +80,11 @@ async def lifespan(app: FastAPI):
                 router=build_millatchiroqlaribot_router(),
                 admin_ids=settings.MILLATCHIROQLARIBOT_ADMIN_IDS,
             ),
+        )
+    elif settings.MILLATCHIROQLARIBOT_BOT_TOKEN:
+        logger.info(
+            "Skipping webhook for 'millatchiroqlaribot' because mode=%s",
+            settings.MILLATCHIROQLARIBOT_MODE,
         )
 
     await registry.set_webhooks()
