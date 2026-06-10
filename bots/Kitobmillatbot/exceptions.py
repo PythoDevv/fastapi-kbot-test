@@ -38,3 +38,12 @@ class NoQuestionsError(KitobxonError):
 
 class AlreadySolvedError(KitobxonError):
     pass
+
+
+class QuestionDeletionBlockedError(KitobxonError):
+    def __init__(self, question_id: int, active_sessions_count: int):
+        super().__init__(
+            f"Question {question_id} is used in {active_sessions_count} active session(s)"
+        )
+        self.question_id = question_id
+        self.active_sessions_count = active_sessions_count

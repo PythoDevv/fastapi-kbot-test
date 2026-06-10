@@ -4,6 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Document, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bots.kitobxon.exceptions import QuestionDeletionBlockedError
 from bots.kitobxon.keyboards import inline, reply
 from bots.kitobxon.services import AdminService
 from bots.kitobxon.states import AdminQuestionStates, AdminQuestionImportStates
@@ -11,6 +12,7 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 router = Router(name="admin_questions")
+QUESTIONS_PAGE_SIZE = 20
 
 
 async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
@@ -21,16 +23,57 @@ async def _is_admin(session: AsyncSession, telegram_id: int) -> bool:
     return bool(user and user.is_admin)
 
 
+def _questions_page_text(count: int, page: int, total_pages: int) -> str:
+    if count == 0:
+        return "Savollar hozircha yo'q."
+    return (
+        f"Jami savollar: <b>{count}</b>\n"
+        f"Sahifa: <b>{page + 1}/{total_pages}</b>"
+    )
+
+
+async def _show_questions_page(
+    target: Message | CallbackQuery,
+    session: AsyncSession,
+    *,
+    page: int = 0,
+) -> None:
+    questions = await AdminService(session).list_questions()
+    count = len(questions)
+    total_pages = max(1, (count + QUESTIONS_PAGE_SIZE - 1) // QUESTIONS_PAGE_SIZE)
+    page = max(0, min(page, total_pages - 1))
+    text = _questions_page_text(count, page, total_pages)
+    reply_markup = inline.questions_list_keyboard(
+        questions,
+        page=page,
+        page_size=QUESTIONS_PAGE_SIZE,
+    )
+    if isinstance(target, CallbackQuery):
+        await target.message.edit_text(text, reply_markup=reply_markup)
+    else:
+        await target.answer(text, reply_markup=reply_markup)
+
+
 @router.message(F.text.in_({"❓ Savollar", "Savollar ro'yxati"}))
 async def questions_menu(message: Message, session: AsyncSession) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
-    questions = await AdminService(session).list_questions()
-    count = len(questions)
-    await message.answer(
-        f"Jami savollar: <b>{count}</b>",
-        reply_markup=inline.questions_list_keyboard(questions),
-    )
+    await _show_questions_page(message, session, page=0)
+
+
+@router.callback_query(F.data.startswith("q_page:"))
+async def paginate_questions(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+    page = int(cb.data.split(":")[1])
+    await _show_questions_page(cb, session, page=page)
+    await cb.answer()
+
+
+@router.callback_query(F.data == "q_page_noop")
+async def noop_questions_page(cb: CallbackQuery) -> None:
+    await cb.answer()
 
 
 @router.callback_query(F.data == "q_export")
@@ -67,13 +110,19 @@ async def delete_question(cb: CallbackQuery, session: AsyncSession) -> None:
     if not await _is_admin(session, cb.from_user.id):
         await cb.answer()
         return
-    q_id = int(cb.data.split(":")[1])
+    parts = cb.data.split(":")
+    q_id = int(parts[1])
+    page = int(parts[2]) if len(parts) > 2 else 0
     service = AdminService(session)
-    await service.delete_question(q_id)
-    questions = await service.list_questions()
-    await cb.message.edit_reply_markup(
-        reply_markup=inline.questions_list_keyboard(questions)
-    )
+    try:
+        await service.delete_question(q_id)
+    except QuestionDeletionBlockedError as exc:
+        await cb.answer(
+            f"Bu savol {exc.active_sessions_count} ta aktiv testda ishlatilmoqda.",
+            show_alert=True,
+        )
+        return
+    await _show_questions_page(cb, session, page=page)
     await cb.answer("O'chirildi.")
 
 

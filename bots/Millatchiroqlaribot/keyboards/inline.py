@@ -112,16 +112,44 @@ def quiz_status_keyboard(is_active: bool, is_waiting: bool, is_finished: bool) -
     )
 
 
-def questions_list_keyboard(questions) -> InlineKeyboardMarkup:
+def questions_list_keyboard(
+    questions,
+    *,
+    page: int = 0,
+    page_size: int = 20,
+) -> InlineKeyboardMarkup:
+    total = len(questions)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page = max(0, min(page, total_pages - 1))
+    start = page * page_size
+    end = start + page_size
+    page_questions = questions[start:end]
     buttons = [
         [
             InlineKeyboardButton(
-                text=f"🗑 {q.text[:40]}",
-                callback_data=f"q_del:{q.id}",
+                text=f"🗑 {start + idx + 1}. {q.text[:36]}",
+                callback_data=f"q_del:{q.id}:{page}",
             )
         ]
-        for q in questions[:30]
+        for idx, q in enumerate(page_questions)
     ]
+    if total_pages > 1:
+        nav_row = []
+        if page > 0:
+            nav_row.append(
+                InlineKeyboardButton(text="⬅️", callback_data=f"q_page:{page - 1}")
+            )
+        nav_row.append(
+            InlineKeyboardButton(
+                text=f"{page + 1}/{total_pages}",
+                callback_data="q_page_noop",
+            )
+        )
+        if page < total_pages - 1:
+            nav_row.append(
+                InlineKeyboardButton(text="➡️", callback_data=f"q_page:{page + 1}")
+            )
+        buttons.append(nav_row)
     buttons.append(
         [
             InlineKeyboardButton(text="➕ Qo'shish", callback_data="q_add"),

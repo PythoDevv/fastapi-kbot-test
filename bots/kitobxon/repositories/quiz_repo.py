@@ -137,6 +137,16 @@ class QuizRepository(BaseRepository[Question]):
         )
         return (await self.session.execute(stmt)).scalar_one_or_none()
 
+    async def count_active_sessions_with_question(self, question_id: int) -> int:
+        stmt = select(TestSession.questions_json).where(TestSession.is_completed.is_(False))
+        rows = (await self.session.execute(stmt)).scalars().all()
+        total = 0
+        for questions_json in rows:
+            question_ids, _quiz_type = self.decode_session_questions(questions_json)
+            if question_id in question_ids:
+                total += 1
+        return total
+
     async def acquire_quiz_lock(self, user_id: int) -> None:
         await self.session.execute(
             select(func.pg_advisory_xact_lock(self._QUIZ_LOCK_NAMESPACE, user_id))

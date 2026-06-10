@@ -364,6 +364,11 @@ class AdminService:
         return q
 
     async def delete_question(self, question_id: int) -> None:
+        from bots.kitobxon.exceptions import QuestionDeletionBlockedError
+
+        active_session_count = await self.quiz.count_active_sessions_with_question(question_id)
+        if active_session_count:
+            raise QuestionDeletionBlockedError(question_id, active_session_count)
         q = await self.quiz.get(question_id)
         if q:
             await self.quiz.delete(q)
