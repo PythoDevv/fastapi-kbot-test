@@ -34,7 +34,7 @@ FONT_CANDIDATES = (
 )
 
 # Name placement (ratios of full image size).
-NAME_Y_RATIO = 0.345          # vertical center of the name line
+NAME_Y_RATIO = 0.40           # vertical center of the name line
 NAME_MAX_WIDTH_RATIO = 0.7    # name must fit within 70% of the width
 NAME_MAX_FONT = 150
 NAME_MIN_FONT = 60

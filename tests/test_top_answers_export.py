@@ -13,6 +13,7 @@ class TopAnswersExportTests(unittest.TestCase):
                 "telegram_id": 111,
                 "fio": "Ali Valiyev",
                 "username": "ali",
+                "mobile_number": "+998901234567",
                 "session_id": 10,
                 "score": 8,
                 "total_questions": 10,
@@ -34,6 +35,7 @@ class TopAnswersExportTests(unittest.TestCase):
                 "telegram_id": 111,
                 "fio": "Ali Valiyev",
                 "username": "ali",
+                "mobile_number": "+998901234567",
                 "session_id": 10,
                 "score": 8,
                 "total_questions": 10,
@@ -58,11 +60,18 @@ class TopAnswersExportTests(unittest.TestCase):
 
         self.assertEqual(sheet.title, "Top 30 javoblar")
         self.assertEqual(sheet.cell(row=1, column=1).value, "Rank")
-        self.assertEqual(sheet.cell(row=1, column=13).value, "Savol №")
+        self.assertEqual(sheet.cell(row=1, column=5).value, "Telefon")
+        self.assertEqual(sheet.cell(row=1, column=14).value, "Savol №")
         self.assertEqual(sheet.cell(row=2, column=2).value, 111)
-        self.assertEqual(sheet.cell(row=2, column=14).value, "Savol 1")
-        self.assertEqual(sheet.cell(row=3, column=16).value, "Javob C")
-        self.assertEqual(sheet.cell(row=3, column=17).value, "Noto'g'ri")
+        self.assertEqual(sheet.cell(row=2, column=5).value, "+998901234567")
+        self.assertEqual(sheet.cell(row=2, column=15).value, "Savol 1")
+        self.assertEqual(sheet.cell(row=3, column=17).value, "Javob C")
+        self.assertEqual(sheet.cell(row=3, column=18).value, "Noto'g'ri")
+
+    def test_export_with_custom_sheet_title(self) -> None:
+        workbook_bytes = export_top_answers_to_excel([], sheet_title="Barcha javoblar")
+        workbook = openpyxl.load_workbook(workbook_bytes)
+        self.assertEqual(workbook.active.title, "Barcha javoblar")
 
 
 if __name__ == "__main__":
