@@ -17,7 +17,7 @@ def main_menu() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="Tanlov kitoblari 📚"),
             ],
             [
-                # KeyboardButton(text="🎖 Mening sertifikatim"),
+                KeyboardButton(text="🎖 Mening sertifikatim"),
                 KeyboardButton(text="Viktorina sovg'alari 🎁"),
             ],
             [KeyboardButton(text="Ismni o'zgartirish ✏️")],
@@ -57,6 +57,9 @@ def admin_panel() -> ReplyKeyboardMarkup:
             [
                 KeyboardButton(text="📊 Test hisobot"),
                 KeyboardButton(text="🏆 Top 30 javoblar"),
+            ],
+            [
+                KeyboardButton(text="📚 Barcha javoblar"),
             ],
             [
                 KeyboardButton(text="Savol yuklash 📥"),

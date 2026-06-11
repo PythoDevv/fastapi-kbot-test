@@ -1,10 +1,18 @@
 """
-Certificate generator using PIL.
-Template: static/certificates/template.png
-Fonts: static/fonts/
+Certificate generator.
+
+Draws the participant's name onto the pre-designed certificate.jpg
+(the empty gap between the "SERTIFIKAT" title and the body text).
+
+Fast path:
+- Base image is decoded once and cached in memory; each request only
+  copies it, draws the name and re-encodes to JPEG.
+- Fonts are cached per size.
+- Output is JPEG (much faster + smaller than PNG for a 3508x2480 image).
 """
 import io
 import os
+from functools import lru_cache
 from pathlib import Path
 
 from aiogram.types import BufferedInputFile
@@ -12,174 +20,119 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
-BASE_DIR = Path(__file__).resolve().parents[3] / "static"
-CERT_TEMPLATE = str(BASE_DIR / "certificates" / "template.png")
-ALT_CERT_TEMPLATE = str(Path(__file__).resolve().parents[1] / "certificate.png")
-FONT_DIR = str(BASE_DIR / "fonts")
-NAME_Y_RATIO = 0.44
-NAME_BASE_FONT_SIZE = 100
-NAME_X_OFFSET = -100
+BOT_DIR = Path(__file__).resolve().parents[1]
+STATIC_DIR = Path(__file__).resolve().parents[3] / "static"
+
+# Pre-designed template that already contains all the static text.
+CERT_TEMPLATE = str(BOT_DIR / "certificate.jpg")
+
+# Bold font: bundled first (guaranteed in Docker), then common system paths.
+FONT_CANDIDATES = (
+    str(STATIC_DIR / "fonts" / "DejaVuSans-Bold.ttf"),
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+)
+
+# Name placement (ratios of full image size).
+NAME_Y_RATIO = 0.345          # vertical center of the name line
+NAME_MAX_WIDTH_RATIO = 0.7    # name must fit within 70% of the width
+NAME_MAX_FONT = 150
+NAME_MIN_FONT = 60
+NAME_FONT_STEP = 4
+NAME_COLOR = (20, 20, 20)
 
 
-def resolve_certificate_template_path() -> str | None:
-    """Return the first available certificate template path."""
-    for candidate in (CERT_TEMPLATE, ALT_CERT_TEMPLATE):
-        if os.path.exists(candidate):
-            return candidate
-    return None
-
-
-def build_certificate_input_file(buffer: io.BytesIO, filename: str = "certificate.png") -> BufferedInputFile:
+def build_certificate_input_file(buffer: io.BytesIO, filename: str = "sertifikat.jpg") -> BufferedInputFile:
     buffer.seek(0)
     return BufferedInputFile(buffer.read(), filename=filename)
 
 
-def _get_optimal_font_size(text: str, max_width: int, base_size: int = 60) -> int:
-    """Calculate optimal font size based on text length and available width"""
-    try:
-        from PIL import ImageFont
-    except ImportError:
-        return base_size
-    
-    name_len = len(text)
-    # Dynamically reduce font size for longer names
-    if name_len > 20:
-        return max(32, base_size - (name_len - 15) * 2)
-    elif name_len > 15:
-        return base_size - 8
-    elif name_len > 12:
-        return base_size - 4
-    return base_size
-
-
 def _format_name_case(name: str) -> str:
-    """Format name with proper case handling (capitalize first letter of each word)"""
+    """Capitalize the first letter of each word."""
     return " ".join(word.capitalize() for word in name.split())
 
 
-def get_name_layout(full_name: str, img_w: int, img_h: int) -> tuple[int, int, int]:
-    formatted_name = _format_name_case(full_name.strip())
-    font_size = _get_optimal_font_size(
-        formatted_name,
-        int(img_w * 0.8),
-        base_size=NAME_BASE_FONT_SIZE,
-    )
-    name_y = int(img_h * NAME_Y_RATIO)
-    return font_size, name_y, NAME_X_OFFSET
+@lru_cache(maxsize=1)
+def _base_image():
+    """Decode the template once and cache it. Returns None if missing."""
+    try:
+        from PIL import Image
+    except ImportError:
+        logger.error("Pillow not installed")
+        return None
+    if not os.path.exists(CERT_TEMPLATE):
+        logger.warning("Certificate template not found: %s", CERT_TEMPLATE)
+        return None
+    return Image.open(CERT_TEMPLATE).convert("RGB")
+
+
+@lru_cache(maxsize=16)
+def _load_font(size: int):
+    from PIL import ImageFont
+
+    for path in FONT_CANDIDATES:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size=size)
+            except OSError:
+                continue
+    logger.warning("No TrueType font found, using PIL default")
+    return ImageFont.load_default()
+
+
+def _fit_font(draw, text: str, max_width: int):
+    """Largest font (within bounds) that keeps the text under max_width."""
+    size = NAME_MAX_FONT
+    while size > NAME_MIN_FONT:
+        font = _load_font(size)
+        if draw.textlength(text, font=font) <= max_width:
+            return font
+        size -= NAME_FONT_STEP
+    return _load_font(NAME_MIN_FONT)
 
 
 def generate_certificate(
     full_name: str,
-    score: int,
-    total: int,
-    font_name: str = "DejaVuSans.ttf",
-    include_total: bool = True,
+    score: int = 0,
+    total: int = 0,
+    font_name: str = "DejaVuSans-Bold.ttf",
+    include_total: bool = False,
 ) -> io.BytesIO | None:
     """
-    Generate a high-quality certificate PNG and return as BytesIO.
+    Render the name onto certificate.jpg and return JPEG bytes.
 
-    Features:
-    - Adaptive font sizing based on name length
-    - Proper name formatting (title case)
-    - High-quality output
-    - Better text rendering with anti-aliasing
-    - Optionally hide the total score for cleaner output
+    score / total / include_total are kept for backwards compatibility
+    but ignored: this template already carries all the static text and
+    only needs the participant's name.
 
-    Returns None if template is not found.
+    Returns None if the template or Pillow is unavailable.
     """
-    try:
-        from PIL import Image, ImageDraw, ImageFont
-    except ImportError:
-        logger.error("Pillow not installed")
+    base = _base_image()
+    if base is None:
         return None
 
-    template_path = resolve_certificate_template_path()
-    if template_path is None:
-        logger.warning(
-            "Certificate template not found. Checked paths: %s, %s",
-            CERT_TEMPLATE,
-            ALT_CERT_TEMPLATE,
-        )
-        return None
-    if template_path != CERT_TEMPLATE:
-        logger.warning("Certificate template missing in static path, using fallback: %s", template_path)
-
-    font_path = os.path.join(FONT_DIR, font_name)
     try:
-        img = Image.open(template_path).convert("RGBA")
-        draw = ImageDraw.Draw(img, "RGBA")
+        from PIL import ImageDraw
 
-        img_w, img_h = img.size
-        
-        # Format name with proper case
-        formatted_name = _format_name_case(full_name.strip())
-        name_font_size, name_y, name_x_offset = get_name_layout(full_name, img_w, img_h)
-        
-        # Name font
-        try:
-            name_font = ImageFont.truetype(font_path, size=name_font_size)
-        except (IOError, OSError):
-            name_font = ImageFont.load_default()
-            logger.warning("Could not load TrueType font, using default")
+        img = base.copy()
+        draw = ImageDraw.Draw(img)
+        w, h = img.size
 
-        # Draw name with better positioning
-        bbox = draw.textbbox((0, 0), formatted_name, font=name_font)
+        name = _format_name_case(full_name.strip())
+        font = _fit_font(draw, name, int(w * NAME_MAX_WIDTH_RATIO))
+
+        bbox = draw.textbbox((0, 0), name, font=font)
         text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
-        name_x = (img_w - text_w) // 2 + name_x_offset
+        x = (w - text_w) // 2 - bbox[0]
+        y = int(h * NAME_Y_RATIO) - text_h // 2 - bbox[1]
 
-        # Draw name with shadow effect for better quality
-        shadow_offset = 2
-        draw.text(
-            (name_x + shadow_offset, name_y + shadow_offset),
-            formatted_name,
-            font=name_font,
-            fill=(200, 200, 200, 100),
-        )
-        # Main name text
-        draw.text(
-            (name_x, name_y),
-            formatted_name,
-            font=name_font,
-            fill=(33, 33, 33, 255),
-        )
-
-        if include_total:
-            # Score font
-            try:
-                score_font = ImageFont.truetype(font_path, size=40)
-            except (IOError, OSError):
-                score_font = ImageFont.load_default()
-
-            score_text = f"{score}/{total}"
-            score_bbox = draw.textbbox((0, 0), score_text, font=score_font)
-            score_w = score_bbox[2] - score_bbox[0]
-            score_x = (img_w - score_w) // 2
-            score_y = int(img_h * 0.62)
-
-            # Draw score with shadow effect
-            draw.text(
-                (score_x + shadow_offset, score_y + shadow_offset),
-                score_text,
-                font=score_font,
-                fill=(200, 200, 200, 100),
-            )
-            # Main score text
-            draw.text(
-                (score_x, score_y),
-                score_text,
-                font=score_font,
-                fill=(80, 80, 80, 255),
-            )
+        draw.text((x, y), name, font=font, fill=NAME_COLOR)
 
         output = io.BytesIO()
-        # Convert to RGB and save with high quality
-        img_rgb = Image.new("RGB", img.size, (255, 255, 255))
-        img_rgb.paste(img, mask=img.split()[3] if img.mode == "RGBA" else None)
-        img_rgb.save(output, format="PNG", quality=95, optimize=False)
+        img.save(output, format="JPEG", quality=90, optimize=True)
         output.seek(0)
         return output
-
     except Exception:
         logger.exception("Certificate generation failed")
         return None

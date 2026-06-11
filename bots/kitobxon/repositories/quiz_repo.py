@@ -270,18 +270,18 @@ class QuizRepository(BaseRepository[Question]):
             .subquery()
         )
 
+        total_time = func.coalesce(func.sum(TestAnswer.time_taken_seconds), 0)
         stmt = (
             select(
                 User.telegram_id.label("telegram_id"),
                 User.fio.label("fio"),
                 User.username.label("username"),
+                User.mobile_number.label("mobile_number"),
                 TestSession.id.label("session_id"),
                 TestSession.score.label("score"),
                 TestSession.total_questions.label("total_questions"),
                 TestSession.completed_at.label("completed_at"),
-                func.coalesce(func.sum(TestAnswer.time_taken_seconds), 0).label(
-                    "total_time_seconds"
-                ),
+                total_time.label("total_time_seconds"),
                 func.coalesce(
                     func.sum(case((TestAnswer.is_correct.is_(True), 1), else_=0)),
                     0,
@@ -302,18 +302,19 @@ class QuizRepository(BaseRepository[Question]):
                 User.telegram_id,
                 User.fio,
                 User.username,
+                User.mobile_number,
                 TestSession.id,
                 TestSession.score,
                 TestSession.total_questions,
                 TestSession.completed_at,
             )
-            .order_by(TestSession.completed_at.desc(), TestSession.id.desc())
+            .order_by(TestSession.score.desc(), total_time.asc(), TestSession.id.desc())
         )
 
         rows = (await self.session.execute(stmt)).mappings().all()
         return [dict(row) for row in rows]
 
-    async def get_top_latest_completed_sessions(self, limit: int = 30) -> list[dict]:
+    async def get_top_latest_completed_sessions(self, limit: int | None = 30) -> list[dict]:
         latest_sessions = (
             select(
                 TestSession.user_id.label("user_id"),
@@ -329,6 +330,7 @@ class QuizRepository(BaseRepository[Question]):
                 User.telegram_id.label("telegram_id"),
                 User.fio.label("fio"),
                 User.username.label("username"),
+                User.mobile_number.label("mobile_number"),
                 TestSession.id.label("session_id"),
                 TestSession.score.label("score"),
                 TestSession.total_questions.label("total_questions"),
@@ -337,11 +339,28 @@ class QuizRepository(BaseRepository[Question]):
             .join(latest_sessions, latest_sessions.c.session_id == TestSession.id)
             .join(User, User.id == TestSession.user_id)
             .order_by(TestSession.score.desc(), TestSession.completed_at.desc(), TestSession.id.desc())
-            .limit(limit)
         )
+        if limit is not None:
+            stmt = stmt.limit(limit)
 
         rows = (await self.session.execute(stmt)).mappings().all()
         return [dict(row) for row in rows]
+
+    async def get_answers_for_sessions(
+        self, session_ids: list[int]
+    ) -> dict[int, list[TestAnswer]]:
+        if not session_ids:
+            return {}
+        stmt = (
+            select(TestAnswer)
+            .where(TestAnswer.session_id.in_(session_ids))
+            .order_by(TestAnswer.session_id, TestAnswer.question_index)
+        )
+        answers = (await self.session.execute(stmt)).scalars().all()
+        grouped: dict[int, list[TestAnswer]] = {}
+        for answer in answers:
+            grouped.setdefault(answer.session_id, []).append(answer)
+        return grouped
 
     async def get_session_answers(self, session_id: int) -> list[TestAnswer]:
         stmt = (

@@ -161,6 +161,7 @@ def export_test_results_summary_to_excel(rows: list[dict[str, Any]]) -> io.Bytes
         "Telegram ID",
         "FIO",
         "Username",
+        "Telefon",
         "Session ID",
         "Ball",
         "Jami savol",
@@ -197,22 +198,23 @@ def export_test_results_summary_to_excel(rows: list[dict[str, Any]]) -> io.Bytes
             column=4,
             value=f"@{row['username']}" if row.get("username") else "",
         )
-        ws.cell(row=row_idx, column=5, value=row.get("session_id"))
-        ws.cell(row=row_idx, column=6, value=row.get("score") or 0)
-        ws.cell(row=row_idx, column=7, value=row.get("total_questions") or 0)
-        ws.cell(row=row_idx, column=8, value=row.get("correct_count") or 0)
-        ws.cell(row=row_idx, column=9, value=row.get("incorrect_count") or 0)
-        ws.cell(row=row_idx, column=10, value=row.get("timeout_count") or 0)
-        ws.cell(row=row_idx, column=11, value=total_time_seconds)
-        ws.cell(row=row_idx, column=12, value=time_str)
+        ws.cell(row=row_idx, column=5, value=row.get("mobile_number") or "")
+        ws.cell(row=row_idx, column=6, value=row.get("session_id"))
+        ws.cell(row=row_idx, column=7, value=row.get("score") or 0)
+        ws.cell(row=row_idx, column=8, value=row.get("total_questions") or 0)
+        ws.cell(row=row_idx, column=9, value=row.get("correct_count") or 0)
+        ws.cell(row=row_idx, column=10, value=row.get("incorrect_count") or 0)
+        ws.cell(row=row_idx, column=11, value=row.get("timeout_count") or 0)
+        ws.cell(row=row_idx, column=12, value=total_time_seconds)
+        ws.cell(row=row_idx, column=13, value=time_str)
         completed_at = row.get("completed_at")
         ws.cell(
             row=row_idx,
-            column=13,
+            column=14,
             value=completed_at.strftime("%Y-%m-%d %H:%M:%S") if completed_at else "",
         )
 
-    col_widths = [5, 16, 30, 20, 12, 8, 10, 8, 10, 10, 14, 12, 20]
+    col_widths = [5, 16, 30, 20, 18, 12, 8, 10, 8, 10, 10, 14, 12, 20]
     for col_idx, width in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(col_idx)].width = width
 
@@ -222,16 +224,19 @@ def export_test_results_summary_to_excel(rows: list[dict[str, Any]]) -> io.Bytes
     return buf
 
 
-def export_top_answers_to_excel(rows: list[dict[str, Any]]) -> io.BytesIO:
+def export_top_answers_to_excel(
+    rows: list[dict[str, Any]], sheet_title: str = "Top 30 javoblar"
+) -> io.BytesIO:
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Top 30 javoblar"
+    ws.title = sheet_title
 
     headers = [
         "Rank",
         "Telegram ID",
         "FIO",
         "Username",
+        "Telefon",
         "Session ID",
         "Umumiy ball",
         "Jami savol",
@@ -266,6 +271,7 @@ def export_top_answers_to_excel(rows: list[dict[str, Any]]) -> io.BytesIO:
                 "telegram_id",
                 "fio",
                 "username",
+                "mobile_number",
                 "session_id",
                 "score",
                 "total_questions",
@@ -286,7 +292,7 @@ def export_top_answers_to_excel(rows: list[dict[str, Any]]) -> io.BytesIO:
         ):
             ws.cell(row=row_idx, column=col_idx, value=row.get(key, ""))
 
-    col_widths = [8, 16, 28, 20, 12, 12, 12, 12, 14, 12, 16, 20, 10, 50, 28, 28, 12, 10, 18]
+    col_widths = [8, 16, 28, 20, 18, 12, 12, 12, 12, 14, 12, 16, 20, 10, 50, 28, 28, 12, 10, 18]
     for col_idx, width in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(col_idx)].width = width
 

@@ -80,6 +80,7 @@ def _build_top_answers_rows(top_sessions: list[dict], answers_by_session: dict[i
             "telegram_id": session_row["telegram_id"],
             "fio": session_row.get("fio") or "",
             "username": f"@{session_row['username']}" if session_row.get("username") else "",
+            "mobile_number": session_row.get("mobile_number") or "",
             "session_id": session_row["session_id"],
             "score": session_row.get("score") or 0,
             "total_questions": session_row.get("total_questions") or 0,
@@ -276,16 +277,42 @@ async def export_top_answers(
         await message.answer("Top 30 uchun yakunlangan testlar topilmadi.")
         return
 
-    answers_by_session = {
-        row["session_id"]: await quiz_repo.get_session_answers(row["session_id"])
-        for row in top_sessions
-    }
+    answers_by_session = await quiz_repo.get_answers_for_sessions(
+        [row["session_id"] for row in top_sessions]
+    )
     export_rows = _build_top_answers_rows(top_sessions, answers_by_session)
     buf = await asyncio.to_thread(export_top_answers_to_excel, export_rows)
 
     await message.answer_document(
         document=BufferedInputFile(buf.read(), filename="top_30_javoblar.xlsx"),
         caption=f"Top 30 bo'yicha {len(top_sessions)} ta foydalanuvchi javoblari eksport qilindi.",
+    )
+
+
+@router.message(F.text == "📚 Barcha javoblar")
+async def export_all_answers(
+    message: Message, session: AsyncSession
+) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+
+    quiz_repo = QuizRepository(session)
+    all_sessions = await quiz_repo.get_top_latest_completed_sessions(limit=None)
+    if not all_sessions:
+        await message.answer("Yakunlangan testlar topilmadi.")
+        return
+
+    answers_by_session = await quiz_repo.get_answers_for_sessions(
+        [row["session_id"] for row in all_sessions]
+    )
+    export_rows = _build_top_answers_rows(all_sessions, answers_by_session)
+    buf = await asyncio.to_thread(
+        export_top_answers_to_excel, export_rows, "Barcha javoblar"
+    )
+
+    await message.answer_document(
+        document=BufferedInputFile(buf.read(), filename="barcha_javoblar.xlsx"),
+        caption=f"Barcha foydalanuvchilar javoblari: {len(all_sessions)} ta user eksport qilindi.",
     )
 
 

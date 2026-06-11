@@ -59,6 +59,9 @@ def admin_panel() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="🏆 Top 30 javoblar"),
             ],
             [
+                KeyboardButton(text="📚 Barcha javoblar"),
+            ],
+            [
                 KeyboardButton(text="Savol yuklash 📥"),
                 KeyboardButton(text="Namuna olish 📄"),
             ],
