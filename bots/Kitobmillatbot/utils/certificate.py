@@ -40,6 +40,11 @@ NAME_MAX_FONT = 150
 NAME_MIN_FONT = 60
 NAME_FONT_STEP = 4
 NAME_COLOR = (20, 20, 20)
+QR_LINK = "https://t.me/Kitobxon_millatmiz"
+QR_SIZE_RATIO = 0.12
+QR_MARGIN_X_RATIO = 0.065
+QR_MARGIN_BOTTOM_RATIO = 0.11
+QR_BACKGROUND_PADDING_RATIO = 0.01
 
 
 def build_certificate_input_file(buffer: io.BytesIO, filename: str = "sertifikat.jpg") -> BufferedInputFile:
@@ -91,6 +96,52 @@ def _fit_font(draw, text: str, max_width: int):
     return _load_font(NAME_MIN_FONT)
 
 
+def _build_qr_image(qr_size: int):
+    try:
+        import qrcode
+        from PIL import Image
+    except ImportError:
+        logger.warning("qrcode or Pillow not installed, skipping QR overlay")
+        return None
+
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(QR_LINK)
+    qr.make(fit=True)
+
+    qr_image = qr.make_image(fill_color="black", back_color="white")
+    if hasattr(qr_image, "get_image"):
+        qr_image = qr_image.get_image()
+    qr_image = qr_image.convert("RGB")
+    return qr_image.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
+
+
+def _paste_qr_code(img) -> None:
+    w, h = img.size
+    qr_size = max(180, int(w * QR_SIZE_RATIO))
+    qr_image = _build_qr_image(qr_size)
+    if qr_image is None:
+        return
+
+    from PIL import Image
+
+    padding = max(10, int(w * QR_BACKGROUND_PADDING_RATIO))
+    background = Image.new(
+        "RGB",
+        (qr_size + padding * 2, qr_size + padding * 2),
+        "white",
+    )
+    background.paste(qr_image, (padding, padding))
+
+    x = int(w * QR_MARGIN_X_RATIO)
+    y = h - background.height - int(h * QR_MARGIN_BOTTOM_RATIO)
+    img.paste(background, (x, y))
+
+
 def generate_certificate(
     full_name: str,
     score: int = 0,
@@ -128,6 +179,7 @@ def generate_certificate(
         y = int(h * NAME_Y_RATIO) - text_h // 2 - bbox[1]
 
         draw.text((x, y), name, font=font, fill=NAME_COLOR)
+        _paste_qr_code(img)
 
         output = io.BytesIO()
         img.save(output, format="JPEG", quality=90, optimize=True)
