@@ -289,30 +289,30 @@ async def export_top_answers(
     )
 
 
-@router.message(F.text == "📚 Barcha javoblar")
-async def export_all_answers(
+@router.message(F.text.in_({"📚 Barcha javoblar", "📚 Top 40 javoblar"}))
+async def export_top_40_answers(
     message: Message, session: AsyncSession
 ) -> None:
     if not await _is_admin(session, message.from_user.id):
         return
 
     quiz_repo = QuizRepository(session)
-    all_sessions = await quiz_repo.get_top_latest_completed_sessions(limit=None)
-    if not all_sessions:
+    top_sessions = await quiz_repo.get_top_latest_completed_sessions(limit=40)
+    if not top_sessions:
         await message.answer("Yakunlangan testlar topilmadi.")
         return
 
     answers_by_session = await quiz_repo.get_answers_for_sessions(
-        [row["session_id"] for row in all_sessions]
+        [row["session_id"] for row in top_sessions]
     )
-    export_rows = _build_top_answers_rows(all_sessions, answers_by_session)
+    export_rows = _build_top_answers_rows(top_sessions, answers_by_session)
     buf = await asyncio.to_thread(
-        export_top_answers_to_excel, export_rows, "Barcha javoblar"
+        export_top_answers_to_excel, export_rows, "Top 40 javoblar"
     )
 
     await message.answer_document(
-        document=BufferedInputFile(buf.read(), filename="barcha_javoblar.xlsx"),
-        caption=f"Barcha foydalanuvchilar javoblari: {len(all_sessions)} ta user eksport qilindi.",
+        document=BufferedInputFile(buf.read(), filename="top_40_javoblar.xlsx"),
+        caption=f"Top 40 bo'yicha {len(top_sessions)} ta foydalanuvchi javoblari eksport qilindi.",
     )
 
 
