@@ -41,10 +41,10 @@ NAME_MIN_FONT = 60
 NAME_FONT_STEP = 4
 NAME_COLOR = (20, 20, 20)
 QR_LINK = "https://t.me/Kitobxon_millatmiz"
-QR_SIZE_RATIO = 0.12
-QR_MARGIN_X_RATIO = 0.065
-QR_MARGIN_BOTTOM_RATIO = 0.11
-QR_BACKGROUND_PADDING_RATIO = 0.01
+QR_SIZE_RATIO = 0.07
+QR_MARGIN_X_RATIO = 0.03
+QR_MARGIN_BOTTOM_RATIO = 0.06
+QR_BACKGROUND_PADDING_RATIO = 0.004
 
 
 def build_certificate_input_file(buffer: io.BytesIO, filename: str = "sertifikat.jpg") -> BufferedInputFile:
@@ -122,7 +122,7 @@ def _build_qr_image(qr_size: int):
 
 def _paste_qr_code(img) -> None:
     w, h = img.size
-    qr_size = max(180, int(w * QR_SIZE_RATIO))
+    qr_size = max(140, int(w * QR_SIZE_RATIO))
     qr_image = _build_qr_image(qr_size)
     if qr_image is None:
         return
