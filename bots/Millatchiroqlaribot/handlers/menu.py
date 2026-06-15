@@ -70,7 +70,7 @@ async def referral_link(message: Message, session: AsyncSession) -> None:
     if not contents:
         reply_markup = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="� Tanlovda ishtirob etish 👈", url=link)]
+                [InlineKeyboardButton(text="👉 Tanlovda ishtirok etish 👈", url=link)]
             ]
         )
         await message.answer(link, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
@@ -88,7 +88,7 @@ async def referral_link(message: Message, session: AsyncSession) -> None:
         if content.require_link:
             reply_markup = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="� Tanlovda ishtirob etish 👈", url=link)]
+                    [InlineKeyboardButton(text="👉 Tanlovda ishtirok etish 👈", url=link)]
                 ]
             )
 
