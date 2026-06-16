@@ -38,12 +38,12 @@ class SubsService:
             if not await self._is_member(bot, ch.channel_id, telegram_id):
                 missing.append(ch)
 
-        requested_or_approved = await self.zayafka.get_user_recorded_ids(user_db_id)
+        # A pending join request must NOT bypass the membership check.
+        # Only real membership (admin approved the request) lets the user in.
         missing_zayafka: list[ZayafkaChannelSnapshot] = []
         for zch in await self.zayafka.list_ordered_cached():
-            if zch.id not in requested_or_approved:
-                if not await self._is_member(bot, zch.channel_id, telegram_id):
-                    missing_zayafka.append(zch)
+            if not await self._is_member(bot, zch.channel_id, telegram_id):
+                missing_zayafka.append(zch)
 
         return SubscriptionStatus(
             all_subscribed=not missing and not missing_zayafka,
