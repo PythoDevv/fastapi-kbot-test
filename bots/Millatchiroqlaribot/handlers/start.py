@@ -60,7 +60,7 @@ async def _continue_after_subscription(
 
     await state.set_state(AuthStates.awaiting_name)
     await message.answer(
-        "Assalomu alaykum! Kitobxon oila tanlovi uchun oila nomini kiriting:",
+        "Assalomu alaykum! Kitobxon oila tanlovi uchun oila nomini kiriting:\n\nMisol uchun : Karimovlar oilasi",
         reply_markup=reply.REMOVE,
     )
     return False
