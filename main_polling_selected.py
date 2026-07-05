@@ -16,6 +16,9 @@ from bots.Kitobmillatbot.repositories import UserRepository as KitobmillatbotUse
 from bots.Millatchiroqlaribot.handlers.router import build_router as build_millatchiroqlaribot_router
 from bots.Millatchiroqlaribot.models import User as MillatchiroqlaribotUser
 from bots.Millatchiroqlaribot.repositories import UserRepository as MillatchiroqlaribotUserRepo
+from bots.Barakali_tanlov_bot.handlers.router import build_router as build_barakali_tanlov_bot_router
+from bots.Barakali_tanlov_bot.models import User as BarakaliTanlovBotUser
+from bots.Barakali_tanlov_bot.repositories import UserRepository as BarakaliTanlovBotUserRepo
 from core.admin_init import initialize_admins
 from core.config import settings
 from core.database import AsyncSessionLocal, dispose_engine
@@ -102,6 +105,17 @@ def _build_specs() -> list[PollingBotSpec]:
                 router_builder=build_millatchiroqlaribot_router,
                 user_model=MillatchiroqlaribotUser,
                 user_repo=MillatchiroqlaribotUserRepo,
+            )
+        )
+    if settings.BARAKALI_TANLOV_BOT_BOT_TOKEN and settings.BARAKALI_TANLOV_BOT_MODE == "polling":
+        specs.append(
+            PollingBotSpec(
+                name="barakali_tanlov_bot",
+                token=settings.BARAKALI_TANLOV_BOT_BOT_TOKEN,
+                admin_ids=settings.BARAKALI_TANLOV_BOT_ADMIN_IDS,
+                router_builder=build_barakali_tanlov_bot_router,
+                user_model=BarakaliTanlovBotUser,
+                user_repo=BarakaliTanlovBotUserRepo,
             )
         )
     return specs

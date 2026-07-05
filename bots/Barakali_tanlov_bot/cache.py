@@ -35,8 +35,6 @@ class RuntimeCache:
         self._zayafka_entry: tuple[float, list[ZayafkaChannelSnapshot]] | None = None
         self._question_ids_entry: tuple[float, list[int]] | None = None
         self._member_entries: dict[tuple[int, int], float] = {}
-        # Warmed from QuizSettings on every settings read; sync-readable by main_menu.
-        self._certificate_button_enabled: bool = False
 
     def _get_valid(self, entry):
         if entry is None:
@@ -89,12 +87,6 @@ class RuntimeCache:
 
     def forget_member(self, chat_id: int, telegram_id: int) -> None:
         self._member_entries.pop((chat_id, telegram_id), None)
-
-    def get_certificate_button_enabled(self) -> bool:
-        return self._certificate_button_enabled
-
-    def set_certificate_button_enabled(self, enabled: bool) -> None:
-        self._certificate_button_enabled = enabled
 
 
 runtime_cache = RuntimeCache()

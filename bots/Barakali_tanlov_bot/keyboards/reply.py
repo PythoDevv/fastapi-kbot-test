@@ -1,17 +1,10 @@
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
-from bots.Millatchiroqlaribot.cache import runtime_cache
-
 ADMIN_BUTTON_ADMINS = "👥 Adminlar"
 REMOVE = ReplyKeyboardRemove()
 
-CERTIFICATE_BUTTON_TEXT = "🎖 Mening sertifikatim"
-
 
 def main_menu() -> ReplyKeyboardMarkup:
-    fourth_row = [KeyboardButton(text="Viktorina sovg'alari 🎁")]
-    if runtime_cache.get_certificate_button_enabled():
-        fourth_row.insert(0, KeyboardButton(text=CERTIFICATE_BUTTON_TEXT))
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="💠 Do'stlarni taklif qilish")],
@@ -23,7 +16,10 @@ def main_menu() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="📝 Tanlov shartlari"),
                 KeyboardButton(text="Tanlov kitoblari 📚"),
             ],
-            fourth_row,
+            [
+                # KeyboardButton(text="🎖 Mening sertifikatim"),
+                KeyboardButton(text="Viktorina sovg'alari 🎁"),
+            ],
             [KeyboardButton(text="Oila nomini o'zgartirish ✏️")],
         ],
         resize_keyboard=True,

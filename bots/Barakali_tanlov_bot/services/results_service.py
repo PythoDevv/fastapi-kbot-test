@@ -4,8 +4,8 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bots.Millatchiroqlaribot.models import User
-from bots.Millatchiroqlaribot.repositories import QuizRepository, UserRepository
+from bots.Barakali_tanlov_bot.models import User
+from bots.Barakali_tanlov_bot.repositories import QuizRepository, UserRepository
 
 
 @dataclass

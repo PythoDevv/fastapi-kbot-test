@@ -4,10 +4,10 @@ from datetime import datetime
 from sqlalchemy import bindparam, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bots.Millatchiroqlaribot.cache import runtime_cache
-from bots.Millatchiroqlaribot.config import QuizType
-from bots.Millatchiroqlaribot.models import ActivityBook, Channel, Question, User, ZayafkaChannel
-from bots.Millatchiroqlaribot.repositories import (
+from bots.Barakali_tanlov_bot.cache import runtime_cache
+from bots.Barakali_tanlov_bot.config import QuizType
+from bots.Barakali_tanlov_bot.models import ActivityBook, Channel, Question, User, ZayafkaChannel
+from bots.Barakali_tanlov_bot.repositories import (
     BookRepository,
     ChannelRepository,
     ContentRepository,
@@ -84,7 +84,7 @@ class AdminService:
     ) -> User:
         user = await self.users.get_by_telegram_id(target_telegram_id)
         if user is None:
-            from bots.Millatchiroqlaribot.exceptions import UserNotFoundError
+            from bots.Barakali_tanlov_bot.exceptions import UserNotFoundError
             raise UserNotFoundError(target_telegram_id)
         old_score = user.score
         await self.users.update_fields(target_telegram_id, score=new_score)
@@ -112,7 +112,7 @@ class AdminService:
             raise ValueError("Referral count is out of allowed range")
         user = await self.users.get_by_telegram_id(target_telegram_id)
         if user is None:
-            from bots.Millatchiroqlaribot.exceptions import UserNotFoundError
+            from bots.Barakali_tanlov_bot.exceptions import UserNotFoundError
             raise UserNotFoundError(target_telegram_id)
         old_count = user.referrals_count
         await self.users.update_fields(target_telegram_id, referrals_count=new_count)
@@ -269,7 +269,7 @@ class AdminService:
     async def reset_test(self, target_telegram_id: int) -> None:
         user = await self.users.get_by_telegram_id(target_telegram_id)
         if user is None:
-            from bots.Millatchiroqlaribot.exceptions import UserNotFoundError
+            from bots.Barakali_tanlov_bot.exceptions import UserNotFoundError
             raise UserNotFoundError(target_telegram_id)
 
         session_score_total = await self.quiz.sum_session_scores(user.id)
@@ -364,7 +364,7 @@ class AdminService:
         return q
 
     async def delete_question(self, question_id: int) -> None:
-        from bots.Millatchiroqlaribot.exceptions import QuestionDeletionBlockedError
+        from bots.Barakali_tanlov_bot.exceptions import QuestionDeletionBlockedError
 
         active_session_count = await self.quiz.count_active_sessions_with_question(question_id)
         if active_session_count:
@@ -412,12 +412,6 @@ class AdminService:
         s = await self.quiz.ensure_settings()
         s.require_phone_number = not s.require_phone_number
         await self.session.flush()
-
-    async def toggle_certificate_button(self) -> None:
-        s = await self.quiz.ensure_settings()
-        s.show_certificate_button = not s.show_certificate_button
-        await self.session.flush()
-        runtime_cache.set_certificate_button_enabled(s.show_certificate_button)
 
     async def set_rating_limit(self, value: int) -> None:
         s = await self.quiz.ensure_settings()

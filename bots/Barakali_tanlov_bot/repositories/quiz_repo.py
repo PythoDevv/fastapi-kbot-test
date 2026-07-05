@@ -4,9 +4,9 @@ from datetime import datetime
 
 from sqlalchemy import case, delete, func, select, update
 
-from bots.Millatchiroqlaribot.cache import runtime_cache
-from bots.Millatchiroqlaribot.config import QuizType
-from bots.Millatchiroqlaribot.models import (
+from bots.Barakali_tanlov_bot.cache import runtime_cache
+from bots.Barakali_tanlov_bot.config import QuizType
+from bots.Barakali_tanlov_bot.models import (
     PollMap,
     Question,
     QuizSettings,
@@ -14,7 +14,7 @@ from bots.Millatchiroqlaribot.models import (
     TestSession,
     User,
 )
-from bots.Millatchiroqlaribot.repositories.base import BaseRepository
+from bots.Barakali_tanlov_bot.repositories.base import BaseRepository
 
 
 class QuizRepository(BaseRepository[Question]):
@@ -78,12 +78,10 @@ class QuizRepository(BaseRepository[Question]):
     async def ensure_settings(self) -> QuizSettings:
         existing = await self.get_settings()
         if existing:
-            runtime_cache.set_certificate_button_enabled(existing.show_certificate_button)
             return existing
         settings = QuizSettings()
         self.session.add(settings)
         await self.session.flush()
-        runtime_cache.set_certificate_button_enabled(settings.show_certificate_button)
         return settings
 
     # --- Questions ---

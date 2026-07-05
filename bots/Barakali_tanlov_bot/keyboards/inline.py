@@ -1,7 +1,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
-from bots.Millatchiroqlaribot.models import Channel, Question, ZayafkaChannel
-from bots.Millatchiroqlaribot.services.quiz_service import QuestionPayload
+from bots.Barakali_tanlov_bot.models import Channel, Question, ZayafkaChannel
+from bots.Barakali_tanlov_bot.services.quiz_service import QuestionPayload
 
 
 def subscription_keyboard(
@@ -236,7 +236,7 @@ def referral_score_repair_confirm_keyboard() -> InlineKeyboardMarkup:
 
 def content_list_keyboard(contents: list | None = None) -> InlineKeyboardMarkup:
     """Keyboard with content items to manage — dynamic from DB + add button"""
-    from bots.Millatchiroqlaribot.models import ContentText
+    from bots.Barakali_tanlov_bot.models import ContentText
     buttons = []
     if contents:
         for ct in contents:
@@ -322,7 +322,6 @@ def quiz_settings_full_keyboard(
     is_finished: bool,
     require_phone: bool,
     current_type: str,
-    show_certificate: bool = False,
 ) -> InlineKeyboardMarkup:
     """Full settings keyboard with status, phone toggle, and quiz type selection"""
     return InlineKeyboardMarkup(
@@ -335,12 +334,6 @@ def quiz_settings_full_keyboard(
                 InlineKeyboardButton(
                     text=f"📱 Telefon {'✅' if require_phone else '❌'}",
                     callback_data="ps:phone",
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text=f"🎖 Sertifikat {'✅' if show_certificate else '❌'}",
-                    callback_data="ps:cert",
                 ),
             ],
             [

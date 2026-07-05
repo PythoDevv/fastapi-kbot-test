@@ -15,6 +15,10 @@ from bots.Millatchiroqlaribot.handlers.router import build_router as build_milla
 from bots.Millatchiroqlaribot.models import User as MillatchiroqlaribotUser
 from bots.Millatchiroqlaribot.repositories import UserRepository as MillatchiroqlaribotUserRepo
 from bots.Millatchiroqlaribot.webapp.router import router as millatchiroqlaribot_webapp_router
+from bots.Barakali_tanlov_bot.handlers.router import build_router as build_barakali_tanlov_bot_router
+from bots.Barakali_tanlov_bot.models import User as BarakaliTanlovBotUser
+from bots.Barakali_tanlov_bot.repositories import UserRepository as BarakaliTanlovBotUserRepo
+from bots.Barakali_tanlov_bot.webapp.router import router as barakali_tanlov_bot_webapp_router
 from core.admin_init import initialize_admins
 from core.config import settings
 from core.database import AsyncSessionLocal, dispose_engine
@@ -87,6 +91,24 @@ async def lifespan(app: FastAPI):
             settings.MILLATCHIROQLARIBOT_MODE,
         )
 
+    # Register barakali_tanlov_bot
+    if settings.BARAKALI_TANLOV_BOT_BOT_TOKEN and _uses_webhook(settings.BARAKALI_TANLOV_BOT_MODE):
+        registry.register(
+            app,
+            BotConfig(
+                name="barakali_tanlov_bot",
+                token=settings.BARAKALI_TANLOV_BOT_BOT_TOKEN,
+                webhook_path=settings.BARAKALI_TANLOV_BOT_WEBHOOK_PATH,
+                router=build_barakali_tanlov_bot_router(),
+                admin_ids=settings.BARAKALI_TANLOV_BOT_ADMIN_IDS,
+            ),
+        )
+    elif settings.BARAKALI_TANLOV_BOT_BOT_TOKEN:
+        logger.info(
+            "Skipping webhook for 'barakali_tanlov_bot' because mode=%s",
+            settings.BARAKALI_TANLOV_BOT_MODE,
+        )
+
     await registry.set_webhooks()
 
     # Initialize admin users for each bot
@@ -98,6 +120,9 @@ async def lifespan(app: FastAPI):
     if settings.MILLATCHIROQLARIBOT_BOT_TOKEN:
         async with AsyncSessionLocal() as session:
             await initialize_admins(session, settings.MILLATCHIROQLARIBOT_ADMIN_IDS, MillatchiroqlaribotUser, MillatchiroqlaribotUserRepo)
+    if settings.BARAKALI_TANLOV_BOT_BOT_TOKEN:
+        async with AsyncSessionLocal() as session:
+            await initialize_admins(session, settings.BARAKALI_TANLOV_BOT_ADMIN_IDS, BarakaliTanlovBotUser, BarakaliTanlovBotUserRepo)
 
     logger.info("All webhooks set. Ready.")
 
@@ -121,6 +146,7 @@ app.middleware("http")(block_scanner_probes)
 app.include_router(webapp_router)
 app.include_router(kitobmillatbot_webapp_router)
 app.include_router(millatchiroqlaribot_webapp_router)
+app.include_router(barakali_tanlov_bot_webapp_router)
 
 
 @app.get("/", include_in_schema=False)

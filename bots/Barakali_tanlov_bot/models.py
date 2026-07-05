@@ -14,7 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from bots.Millatchiroqlaribot.config import QuizType, TABLE_PREFIX
+from bots.Barakali_tanlov_bot.config import QuizType, TABLE_PREFIX
 from core.base_model import Base, TimestampMixin
 
 
@@ -57,7 +57,7 @@ class User(Base, TimestampMixin):
     how_did_find: Mapped[str | None] = mapped_column(String(255))
 
     test_sessions: Mapped[list["TestSession"]] = relationship(
-        "bots.Millatchiroqlaribot.models.TestSession",
+        "bots.Barakali_tanlov_bot.models.TestSession",
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -93,7 +93,7 @@ class ZayafkaChannel(Base, TimestampMixin):
 class UserZayafkaChannel(Base):
     __tablename__ = t("user_zayafka_channels")
     __table_args__ = (
-        UniqueConstraint("user_id", "zayafka_channel_id", name="uq_millatchiroqlaribot_user_zayafka"),
+        UniqueConstraint("user_id", "zayafka_channel_id", name="uq_barakali_tanlov_bot_user_zayafka"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -117,7 +117,7 @@ class QuizSettings(Base, TimestampMixin):
     quiz_type: Mapped[QuizType] = mapped_column(
         SAEnum(
             QuizType,
-            name="millatchiroqlaribot_quiz_type_enum",
+            name="barakali_tanlov_bot_quiz_type_enum",
             values_callable=quiz_type_db_values,
         ),
         default=QuizType.WEB,
@@ -140,7 +140,6 @@ class QuizSettings(Base, TimestampMixin):
     intro_text: Mapped[str | None] = mapped_column(Text)
     require_link: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     require_phone_number: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    show_certificate_button: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
 class Question(Base, TimestampMixin):
@@ -157,7 +156,7 @@ class Question(Base, TimestampMixin):
 class TestSession(Base, TimestampMixin):
     __tablename__ = t("test_sessions")
     __table_args__ = (
-        Index("ix_millatchiroqlaribot_test_sessions_user_completed_id", "user_id", "is_completed", "id"),
+        Index("ix_barakali_tanlov_bot_test_sessions_user_completed_id", "user_id", "is_completed", "id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -174,7 +173,7 @@ class TestSession(Base, TimestampMixin):
     quiz_type: Mapped[QuizType] = mapped_column(
         SAEnum(
             QuizType,
-            name="millatchiroqlaribot_quiz_type_enum",
+            name="barakali_tanlov_bot_quiz_type_enum",
             values_callable=quiz_type_db_values,
         ),
         default=QuizType.WEB,
@@ -186,11 +185,11 @@ class TestSession(Base, TimestampMixin):
     total_questions: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     user: Mapped["User"] = relationship(
-        "bots.Millatchiroqlaribot.models.User",
+        "bots.Barakali_tanlov_bot.models.User",
         back_populates="test_sessions",
     )
     answers: Mapped[list["TestAnswer"]] = relationship(
-        "bots.Millatchiroqlaribot.models.TestAnswer",
+        "bots.Barakali_tanlov_bot.models.TestAnswer",
         back_populates="session", cascade="all, delete-orphan"
     )
 
@@ -198,7 +197,7 @@ class TestSession(Base, TimestampMixin):
 class TestAnswer(Base, TimestampMixin):
     __tablename__ = t("test_answers")
     __table_args__ = (
-        Index("ix_millatchiroqlaribot_test_answers_session_question", "session_id", "question_index"),
+        Index("ix_barakali_tanlov_bot_test_answers_session_question", "session_id", "question_index"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -222,7 +221,7 @@ class TestAnswer(Base, TimestampMixin):
     )
 
     session: Mapped["TestSession"] = relationship(
-        "bots.Millatchiroqlaribot.models.TestSession",
+        "bots.Barakali_tanlov_bot.models.TestSession",
         back_populates="answers",
     )
 
@@ -232,7 +231,7 @@ class PollMap(Base, TimestampMixin):
 
     __tablename__ = t("poll_map")
     __table_args__ = (
-        Index("ix_millatchiroqlaribot_poll_map_session_id", "session_id"),
+        Index("ix_barakali_tanlov_bot_poll_map_session_id", "session_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

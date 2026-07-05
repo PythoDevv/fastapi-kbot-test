@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     MILLATCHIROQLARIBOT_ADMIN_IDS: list[int] = Field(default_factory=lambda: [935795577])
     MILLATCHIROQLARIBOT_WEBHOOK_PATH: str = "/millatchiroqlaribot/webhook"
     MILLATCHIROQLARIBOT_MODE: Literal["webhook", "polling", "disabled"] = "webhook"
+
+    BARAKALI_TANLOV_BOT_BOT_TOKEN: str = ""
+    BARAKALI_TANLOV_BOT_ADMIN_IDS: list[int] = Field(default_factory=lambda: [935795577])
+    BARAKALI_TANLOV_BOT_WEBHOOK_PATH: str = "/barakali_tanlov_bot/webhook"
+    BARAKALI_TANLOV_BOT_MODE: Literal["webhook", "polling", "disabled"] = "webhook"
     WEBAPP_JWT_SECRET: str = "change-me-webapp-jwt-secret-32chars"
     WEBAPP_JWT_TTL_SECONDS: int = 60 * 60 * 5
 
