@@ -1,7 +1,7 @@
-"""add show_certificate_button to millatchiroqlaribot quiz settings
+"""add show_certificate_button to barakali_tanlov_bot quiz settings
 
-Revision ID: f5b8d2c47e10
-Revises: f1a2b3c4d5e6
+Revision ID: a7c3e9f21b48
+Revises: f5b8d2c47e10
 Create Date: 2026-07-05 00:00:00.000000
 
 """
@@ -11,15 +11,15 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "f5b8d2c47e10"
-down_revision: Union[str, None] = "f1a2b3c4d5e6"
+revision: str = "a7c3e9f21b48"
+down_revision: Union[str, None] = "f5b8d2c47e10"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
     op.add_column(
-        "millatchiroqlaribot_quiz_settings",
+        "barakali_tanlov_bot_quiz_settings",
         sa.Column(
             "show_certificate_button",
             sa.Boolean(),
@@ -30,4 +30,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column("millatchiroqlaribot_quiz_settings", "show_certificate_button")
+    op.drop_column("barakali_tanlov_bot_quiz_settings", "show_certificate_button")

@@ -140,6 +140,7 @@ class QuizSettings(Base, TimestampMixin):
     intro_text: Mapped[str | None] = mapped_column(Text)
     require_link: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     require_phone_number: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    show_certificate_button: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
 class Question(Base, TimestampMixin):

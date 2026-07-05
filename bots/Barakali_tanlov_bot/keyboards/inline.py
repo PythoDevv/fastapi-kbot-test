@@ -322,6 +322,7 @@ def quiz_settings_full_keyboard(
     is_finished: bool,
     require_phone: bool,
     current_type: str,
+    show_certificate: bool = False,
 ) -> InlineKeyboardMarkup:
     """Full settings keyboard with status, phone toggle, and quiz type selection"""
     return InlineKeyboardMarkup(
@@ -334,6 +335,12 @@ def quiz_settings_full_keyboard(
                 InlineKeyboardButton(
                     text=f"📱 Telefon {'✅' if require_phone else '❌'}",
                     callback_data="ps:phone",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=f"🎖 Sertifikat {'✅' if show_certificate else '❌'}",
+                    callback_data="ps:cert",
                 ),
             ],
             [

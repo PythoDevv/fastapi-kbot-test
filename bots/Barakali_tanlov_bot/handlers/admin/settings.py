@@ -38,6 +38,7 @@ def _format_settings_text(settings_obj) -> str:
         "🟡 Kutmoqda" if settings_obj.waiting else "🔴 Yakunlangan"
     )
     phone_status = "✅ Talab" if _require_phone_enabled(settings_obj) else "❌ Ixtiyoriy"
+    cert_status = "🟢 Yoqilgan" if settings_obj.show_certificate_button else "🔴 O'chirilgan"
     return (
         f"<b>⚙️ Test sozlamalari</b>\n\n"
         f"Status: {status}\n"
@@ -46,7 +47,8 @@ def _format_settings_text(settings_obj) -> str:
         f"O'tish bali: {settings_obj.limit_score}\n"
         f"Vaqt: {settings_obj.time_limit_seconds}s\n"
         f"Reyting soni: {settings_obj.rating_limit} ta\n"
-        f"Telefon: {phone_status}"
+        f"Telefon: {phone_status}\n"
+        f"Sertifikat tugmasi: {cert_status}"
     )
 
 
@@ -60,6 +62,7 @@ async def _safe_edit_settings_message(cb: CallbackQuery, settings_obj) -> None:
                 settings_obj.finished,
                 _require_phone_enabled(settings_obj),
                 settings_obj.quiz_type.value,
+                settings_obj.show_certificate_button,
             )
         )
     except TelegramBadRequest as exc:
@@ -80,6 +83,7 @@ async def show_settings(message: Message, session: AsyncSession) -> None:
             s.finished,
             _require_phone_enabled(s),
             s.quiz_type.value,
+            s.show_certificate_button,
         ),
     )
 
@@ -170,6 +174,19 @@ async def toggle_phone_setting(cb: CallbackQuery, session: AsyncSession) -> None
     await _safe_edit_settings_message(cb, s)
 
 
+@router.callback_query(F.data == "ps:cert")
+async def toggle_certificate_setting(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+    service = AdminService(session)
+    await service.toggle_certificate_button()
+    s = await service.get_settings()
+    cert_status = "🟢 Yoqilgan" if s.show_certificate_button else "🔴 O'chirilgan"
+    await cb.answer(f"Sertifikat tugmasi: {cert_status}")
+    await _safe_edit_settings_message(cb, s)
+
+
 @router.callback_query(F.data == "qs_rating_limit")
 async def start_rating_limit(cb: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
     if not await _is_admin(session, cb.from_user.id):
@@ -216,5 +233,6 @@ async def set_rating_limit(message: Message, state: FSMContext, session: AsyncSe
             s.finished,
             _require_phone_enabled(s),
             s.quiz_type.value,
+            s.show_certificate_button,
         ),
     )

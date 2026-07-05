@@ -78,10 +78,12 @@ class QuizRepository(BaseRepository[Question]):
     async def ensure_settings(self) -> QuizSettings:
         existing = await self.get_settings()
         if existing:
+            runtime_cache.set_certificate_button_enabled(existing.show_certificate_button)
             return existing
         settings = QuizSettings()
         self.session.add(settings)
         await self.session.flush()
+        runtime_cache.set_certificate_button_enabled(settings.show_certificate_button)
         return settings
 
     # --- Questions ---

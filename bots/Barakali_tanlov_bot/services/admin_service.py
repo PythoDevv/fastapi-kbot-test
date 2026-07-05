@@ -413,6 +413,12 @@ class AdminService:
         s.require_phone_number = not s.require_phone_number
         await self.session.flush()
 
+    async def toggle_certificate_button(self) -> None:
+        s = await self.quiz.ensure_settings()
+        s.show_certificate_button = not s.show_certificate_button
+        await self.session.flush()
+        runtime_cache.set_certificate_button_enabled(s.show_certificate_button)
+
     async def set_rating_limit(self, value: int) -> None:
         s = await self.quiz.ensure_settings()
         s.rating_limit = value
