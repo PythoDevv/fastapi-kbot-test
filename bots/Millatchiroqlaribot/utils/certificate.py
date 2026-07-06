@@ -15,6 +15,7 @@ logger = get_logger(__name__)
 BASE_DIR = Path(__file__).resolve().parents[3] / "static"
 CERT_TEMPLATE = str(BASE_DIR / "certificates" / "template.png")
 ALT_CERT_TEMPLATE = str(Path(__file__).resolve().parents[1] / "certificate.png")
+ALT_CERT_TEMPLATE_JPG = str(Path(__file__).resolve().parents[1] / "certificate.jpg")
 FONT_DIR = str(BASE_DIR / "fonts")
 NAME_Y_RATIO = 0.44
 NAME_BASE_FONT_SIZE = 100
@@ -23,7 +24,7 @@ NAME_X_OFFSET = -100
 
 def resolve_certificate_template_path() -> str | None:
     """Return the first available certificate template path."""
-    for candidate in (CERT_TEMPLATE, ALT_CERT_TEMPLATE):
+    for candidate in (ALT_CERT_TEMPLATE_JPG, ALT_CERT_TEMPLATE, CERT_TEMPLATE):
         if os.path.exists(candidate):
             return candidate
     return None
