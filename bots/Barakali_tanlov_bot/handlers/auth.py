@@ -62,7 +62,7 @@ async def _handle_name_submission(
         return
 
     if len(text) < 3:
-        await message.answer("Iltimos, Kitobxon oila tanlovi uchun oila nomini yozish:\n\nMisol uchun : Karimovlar oilasi")
+        await message.answer("Iltimos, Ismingiz va familiyangizni kiriting\n\n Misol uchun : Alijonov Alisher")Z
         return
 
     auth = AuthService(session)
@@ -168,7 +168,7 @@ async def handle_name_change(
         return
 
     if len(text) < 3:
-        await message.answer("Iltimos, Kitobxon oila tanlovi uchun oila nomini yozish:\n\nMisol uchun : Karimovlar oilasi")
+        await message.answer("Iltimos, Ismingiz va familiyangizni kiriting\n\n Misol uchun : Alijonov Alisher")
         return
     await AuthService(session).set_name(message.from_user.id, text)
     await state.clear()
