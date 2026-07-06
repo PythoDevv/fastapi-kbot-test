@@ -62,7 +62,7 @@ async def _handle_name_submission(
         return
 
     if len(text) < 3:
-        await message.answer("Iltimos, Ismingiz va familiyangizni kiriting\n\n Misol uchun : Alijonov Alisher")Z
+        await message.answer("Iltimos, Ismingiz va familiyangizni kiriting\n\n Misol uchun : Alijonov Alisher")
         return
 
     auth = AuthService(session)
