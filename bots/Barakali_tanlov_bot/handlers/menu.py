@@ -52,7 +52,7 @@ async def back_to_menu(
     await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
 
 
-@router.message(F.text == "Oila nomini o'zgartirish ✏️")
+@router.message(F.text == "Ismni o'zgartirish ✏️")
 async def change_name(message: Message, state: FSMContext) -> None:
     await state.set_state(AuthStates.changing_name)
     await message.answer(

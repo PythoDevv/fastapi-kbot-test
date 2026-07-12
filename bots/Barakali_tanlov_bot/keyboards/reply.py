@@ -24,7 +24,7 @@ def main_menu() -> ReplyKeyboardMarkup:
                 KeyboardButton(text="Tanlov kitoblari 📚"),
             ],
             fourth_row,
-            [KeyboardButton(text="Oila nomini o'zgartirish ✏️")],
+            [KeyboardButton(text="Ismni o'zgartirish ✏️")],
         ],
         resize_keyboard=True,
     )
