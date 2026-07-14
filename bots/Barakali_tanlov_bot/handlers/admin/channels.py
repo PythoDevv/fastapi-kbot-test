@@ -23,6 +23,7 @@ def _draft_key(kind: str, telegram_id: int) -> str:
 
 def _normalize_channel_link(link: str, *, allow_skip: bool) -> str | None:
     value = link.strip()
+    print(value, 'value')
     if allow_skip and value == "-":
         return None
     if value.startswith("https://telegram.me/") or value.startswith("https://t.me/") or value.startswith("http://t.me/"):
@@ -117,6 +118,9 @@ async def _process_channel_draft(
 
     if step == "link":
         normalized_link = _normalize_channel_link(text, allow_skip=kind == "channel")
+        await message.answer(
+            normalized_link
+        )
         if normalized_link is None and not (kind == "channel" and text == "-"):
             await message.answer(
                 "To'g'ri link yuboring. Masalan: https://t.me/kanal yoki t.me/kanal"
