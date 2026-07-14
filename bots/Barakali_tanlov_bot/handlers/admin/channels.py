@@ -25,7 +25,7 @@ def _normalize_channel_link(link: str, *, allow_skip: bool) -> str | None:
     value = link.strip()
     if allow_skip and value == "-":
         return None
-    if value.startswith("https://t.me/") or value.startswith("http://t.me/"):
+    if value.startswith("https://telegram.me/") or value.startswith("https://t.me/") or value.startswith("http://t.me/"):
         return value
     if value.startswith("t.me/"):
         return f"https://{value}"
