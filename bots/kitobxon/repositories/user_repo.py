@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sqlalchemy import delete, desc, func, select, update
+from sqlalchemy import delete, desc, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from bots.kitobxon.models import User
@@ -15,6 +15,15 @@ class ReferralScoreRepairCandidate:
     old_score: int
     new_score: int
     referral_count: int
+
+
+# Rows a score reset still has something to do to.
+_SCORE_RESET_FILTER = or_(
+    User.score != 0,
+    User.referrals_count != 0,
+    User.test_solved.is_(True),
+    User.certificate_received.is_(True),
+)
 
 
 class UserRepository(BaseRepository[User]):
@@ -108,6 +117,54 @@ class UserRepository(BaseRepository[User]):
             .order_by(User.id)
         )
         return list((await self.session.execute(stmt)).scalars().all())
+
+    async def count_referred_users(self) -> int:
+        """How many users currently carry a "who invited me" link."""
+        stmt = select(func.count(User.id)).where(User.referred_by.is_not(None))
+        return int((await self.session.execute(stmt)).scalar_one())
+
+    async def reset_referral_links(self) -> int:
+        """Clear referred_by for everyone and reopen the one-time bonus claim.
+
+        Scores and referrals_count are deliberately left untouched: starting a
+        new project only reopens who-invited-whom, it does not rewrite history.
+        Returns the number of affected rows.
+        """
+        result = await self.session.execute(
+            update(User)
+            .where(
+                or_(
+                    User.referred_by.is_not(None),
+                    User.referral_bonus_awarded.is_(True),
+                )
+            )
+            .values(referred_by=None, referral_bonus_awarded=False)
+        )
+        return result.rowcount
+
+    async def count_scored_users(self) -> int:
+        """Users still carrying anything a score reset would wipe."""
+        stmt = select(func.count(User.id)).where(_SCORE_RESET_FILTER)
+        return int((await self.session.execute(stmt)).scalar_one())
+
+    async def reset_all_scores(self) -> int:
+        """Zero out every point source on the user row.
+
+        Referral links (referred_by / referral_bonus_awarded) are deliberately
+        left alone — clearing those is what "Yangi loyiha boshlash" does.
+        Returns the number of affected rows.
+        """
+        result = await self.session.execute(
+            update(User)
+            .where(_SCORE_RESET_FILTER)
+            .values(
+                score=0,
+                referrals_count=0,
+                test_solved=False,
+                certificate_received=False,
+            )
+        )
+        return result.rowcount
 
     async def get_by_telegram_ids(self, telegram_ids: list[int]) -> dict[int, User]:
         if not telegram_ids:

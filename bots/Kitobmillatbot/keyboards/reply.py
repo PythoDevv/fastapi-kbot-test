@@ -1,6 +1,8 @@
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 ADMIN_BUTTON_ADMINS = "👥 Adminlar"
+ADMIN_BUTTON_NEW_PROJECT = "🆕 Yangi loyiha boshlash"
+ADMIN_BUTTON_CLEAR_SCORES = "🧼 Faqat ballarni tozalash"
 REMOVE = ReplyKeyboardRemove()
 
 
@@ -90,6 +92,12 @@ def admin_panel() -> ReplyKeyboardMarkup:
             ],
             [
                 KeyboardButton(text="🎡 Ballarni aylantirish"),
+            ],
+            [
+                KeyboardButton(text=ADMIN_BUTTON_CLEAR_SCORES),
+            ],
+            [
+                KeyboardButton(text=ADMIN_BUTTON_NEW_PROJECT),
             ],
         ],
         resize_keyboard=True,

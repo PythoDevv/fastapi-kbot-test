@@ -233,6 +233,22 @@ class QuizRepository(BaseRepository[Question]):
         )
         await self.session.flush()
 
+    async def count_sessions(self) -> int:
+        return int(
+            (await self.session.execute(select(func.count(TestSession.id))))
+            .scalar_one()
+        )
+
+    async def delete_all_sessions(self) -> int:
+        """Drop every test session.
+
+        Answers and poll maps carry ON DELETE CASCADE, so they go with them.
+        Returns the number of deleted sessions.
+        """
+        result = await self.session.execute(delete(TestSession))
+        await self.session.flush()
+        return result.rowcount
+
     # --- Answers ---
     async def save_answer(self, answer: TestAnswer) -> TestAnswer:
         self.session.add(answer)
