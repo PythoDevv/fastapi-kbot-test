@@ -10,6 +10,7 @@ MODE_ENV_BY_BOT = {
     "kitobmillatbot": "KITOBMILLATBOT_MODE",
     "millatchiroqlaribot": "MILLATCHIROQLARIBOT_MODE",
     "barakali_tanlov_bot": "BARAKALI_TANLOV_BOT_MODE",
+    "manfaadli_konkurs_bot": "MANFAADLI_KONKURS_BOT_MODE",
 }
 
 
