@@ -3,6 +3,8 @@ from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemo
 from bots.Millatchiroqlaribot.cache import runtime_cache
 
 ADMIN_BUTTON_ADMINS = "👥 Adminlar"
+ADMIN_BUTTON_NEW_PROJECT = "🆕 Yangi loyiha boshlash"
+ADMIN_BUTTON_CLEAR_SCORES = "🧼 Faqat ballarni tozalash"
 REMOVE = ReplyKeyboardRemove()
 
 CERTIFICATE_BUTTON_TEXT = "🎖 Mening sertifikatim"
@@ -94,6 +96,12 @@ def admin_panel() -> ReplyKeyboardMarkup:
             ],
             [
                 KeyboardButton(text="🎡 Ballarni aylantirish"),
+            ],
+            [
+                KeyboardButton(text=ADMIN_BUTTON_CLEAR_SCORES),
+            ],
+            [
+                KeyboardButton(text=ADMIN_BUTTON_NEW_PROJECT),
             ],
         ],
         resize_keyboard=True,

@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     BARAKALI_TANLOV_BOT_ADMIN_IDS: list[int] = Field(default_factory=lambda: [935795577])
     BARAKALI_TANLOV_BOT_WEBHOOK_PATH: str = "/barakali_tanlov_bot/webhook"
     BARAKALI_TANLOV_BOT_MODE: Literal["webhook", "polling", "disabled"] = "webhook"
+
+    MANFAADLI_KONKURS_BOT_BOT_TOKEN: str = ""
+    MANFAADLI_KONKURS_BOT_ADMIN_IDS: list[int] = Field(default_factory=lambda: [935795577])
+    MANFAADLI_KONKURS_BOT_WEBHOOK_PATH: str = "/manfaadli_konkurs_bot/webhook"
+    MANFAADLI_KONKURS_BOT_MODE: Literal["webhook", "polling", "disabled"] = "webhook"
+
     WEBAPP_JWT_SECRET: str = "change-me-webapp-jwt-secret-32chars"
     WEBAPP_JWT_TTL_SECONDS: int = 60 * 60 * 5
 

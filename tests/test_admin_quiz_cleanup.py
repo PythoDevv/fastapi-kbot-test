@@ -10,6 +10,7 @@ import pytest
 BOTS = [
     "Barakali_tanlov_bot",
     "Kitobmillatbot",
+    "Manfaadli_konkurs_bot",
     "Millatchiroqlaribot",
     "kitobxon",
 ]

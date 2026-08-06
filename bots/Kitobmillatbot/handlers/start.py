@@ -82,7 +82,9 @@ async def cmd_start(
     # Parse referral and persist to DB immediately so it survives any
     # subsequent state.clear() or /start re-invocation without referral arg.
     args = message.text.split(maxsplit=1)
-    if len(args) > 1 and not result.user.is_registered and not result.user.referred_by:
+    # Registered users may be referred too: after "Yangi loyiha boshlash" wipes
+    # referred_by, an existing member can be invited again exactly once.
+    if len(args) > 1 and not result.user.referred_by:
         try:
             referrer_id = int(args[1])
         except ValueError:

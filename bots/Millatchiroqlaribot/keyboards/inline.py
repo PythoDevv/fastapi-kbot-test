@@ -243,6 +243,40 @@ def admin_stats_keyboard() -> InlineKeyboardMarkup:
     )
 
 
+def score_reset_confirm_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Ha, tozalash",
+                    callback_data="admin_score_reset_confirm",
+                ),
+                InlineKeyboardButton(
+                    text="❌ Bekor qilish",
+                    callback_data="admin_score_reset_cancel",
+                ),
+            ]
+        ]
+    )
+
+
+def new_project_confirm_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Ha, boshlash",
+                    callback_data="admin_new_project_confirm",
+                ),
+                InlineKeyboardButton(
+                    text="❌ Bekor qilish",
+                    callback_data="admin_new_project_cancel",
+                ),
+            ]
+        ]
+    )
+
+
 def referral_score_repair_confirm_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[

@@ -40,6 +40,30 @@ class ReferralScoreRepairResult:
     total_added: int
 
 
+@dataclass
+class NewProjectResetPreview:
+    total_users: int
+    referred_users: int
+
+
+@dataclass
+class NewProjectResetResult:
+    cleared_users: int
+
+
+@dataclass
+class ScoreResetPreview:
+    total_users: int
+    scored_users: int
+    test_sessions: int
+
+
+@dataclass
+class ScoreResetResult:
+    cleared_users: int
+    deleted_sessions: int
+
+
 class AdminService:
     MAX_REASONABLE_REFERRAL_COUNT = 1_000_000
 
@@ -144,6 +168,35 @@ class AdminService:
         deleted_sessions = await self.quiz.delete_all_sessions()
         await self.users.update_all(test_solved=False)
         return deleted_sessions
+
+    async def preview_score_reset(self) -> ScoreResetPreview:
+        return ScoreResetPreview(
+            total_users=await self.users.count(),
+            scored_users=await self.users.count_scored_users(),
+            test_sessions=await self.quiz.count_sessions(),
+        )
+
+    async def apply_score_reset(self) -> ScoreResetResult:
+        """Wipe every point source, leave the referral links untouched."""
+        deleted_sessions = await self.quiz.delete_all_sessions()
+        cleared_users = await self.users.reset_all_scores()
+        await self.session.flush()
+        return ScoreResetResult(
+            cleared_users=cleared_users,
+            deleted_sessions=deleted_sessions,
+        )
+
+    async def preview_new_project_reset(self) -> NewProjectResetPreview:
+        return NewProjectResetPreview(
+            total_users=await self.users.count(),
+            referred_users=await self.users.count_referred_users(),
+        )
+
+    async def apply_new_project_reset(self) -> NewProjectResetResult:
+        """Start a new project: wipe referral links, keep every score."""
+        cleared = await self.users.reset_referral_links()
+        await self.session.flush()
+        return NewProjectResetResult(cleared_users=cleared)
 
     async def preview_referral_score_repair(
         self,

@@ -40,6 +40,43 @@ async def _show_admin_home(message: Message, session: AsyncSession) -> None:
     )
 
 
+def _build_score_reset_preview_text(preview) -> str:
+    return (
+        "<b>🧼 Faqat ballarni tozalash</b>\n\n"
+        "Barcha foydalanuvchilarda ball beruvchi hamma narsa nolga tushadi:\n"
+        "- ball (<code>score</code>) → 0\n"
+        "- referrallar soni → 0\n"
+        "- test yechgan statusi → tozalanadi\n"
+        "- sertifikat olgan statusi → tozalanadi\n"
+        "- test sessiyalari va javoblari butunlay o'chiriladi\n\n"
+        "\"Kim taklif qilgan\" bog'lanishi <b>o'zgarmaydi</b> — "
+        "buning uchun \"🆕 Yangi loyiha boshlash\" bor.\n\n"
+        "⚠️ Bu amalni orqaga qaytarib bo'lmaydi — kerakli hisobotlarni "
+        "oldindan Excel'ga export qilib oling.\n"
+        "⚠️ Ayni paytda test ishlayotgan userlarning sessiyasi ham o'chadi.\n\n"
+        f"Jami foydalanuvchilar: <b>{preview.total_users}</b>\n"
+        f"Tozalanadigan userlar: <b>{preview.scored_users}</b>\n"
+        f"O'chiriladigan test sessiyalari: <b>{preview.test_sessions}</b>\n\n"
+        "Tasdiqlaysizmi?"
+    )
+
+
+def _build_new_project_preview_text(preview) -> str:
+    return (
+        "<b>🆕 Yangi loyiha boshlash</b>\n\n"
+        "Bu amal referral hisobini noldan ochadi:\n"
+        "- \"Kim taklif qilgan\" (<code>referred_by</code>) ustuni butunlay tozalanadi\n"
+        "- bir martalik referral bonus qulfi qayta ochiladi\n\n"
+        "Ballar va referrallar soni <b>o'zgarmaydi</b>.\n"
+        "⚠️ \"📋 Taklif qilinganlar\" ro'yxati bo'shab qoladi.\n\n"
+        "Shundan keyin botda allaqachon bor foydalanuvchini ham qayta taklif qilish "
+        "mumkin bo'ladi — u shartlarni bajarganda taklif qiluvchiga ball qo'shiladi.\n\n"
+        f"Jami foydalanuvchilar: <b>{preview.total_users}</b>\n"
+        f"Tozalanadigan \"kim taklif qilgan\" yozuvlari: <b>{preview.referred_users}</b>\n\n"
+        "Tasdiqlaysizmi?"
+    )
+
+
 def _build_referral_repair_preview_text(preview) -> str:
     text = (
         "<b>🎡 Referral Ball Repair</b>\n\n"
@@ -296,3 +333,96 @@ async def show_top_test_takers(callback: CallbackQuery, session: AsyncSession) -
             await callback.message.answer(part)
     else:
         await callback.message.answer(text)
+
+
+@router.message(F.text == reply.ADMIN_BUTTON_NEW_PROJECT)
+async def preview_new_project_reset(message: Message, session: AsyncSession) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+
+    preview = await AdminService(session).preview_new_project_reset()
+    await message.answer(
+        _build_new_project_preview_text(preview),
+        reply_markup=inline.new_project_confirm_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "admin_new_project_cancel")
+async def cancel_new_project_reset(
+    callback: CallbackQuery, session: AsyncSession
+) -> None:
+    if not await _is_admin(session, callback.from_user.id):
+        await callback.answer()
+        return
+    await callback.message.edit_text("Yangi loyiha boshlash bekor qilindi.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_new_project_confirm")
+async def run_new_project_reset(
+    callback: CallbackQuery, session: AsyncSession
+) -> None:
+    if not await _is_admin(session, callback.from_user.id):
+        await callback.answer()
+        return
+
+    result = await AdminService(session).apply_new_project_reset()
+    await session.commit()
+
+    logger.info(
+        "New project started by admin=%s, cleared referral links=%s",
+        callback.from_user.id,
+        result.cleared_users,
+    )
+    await callback.message.edit_text(
+        "✅ <b>Yangi loyiha boshlandi.</b>\n\n"
+        f"Tozalangan yozuvlar: <b>{result.cleared_users}</b>\n\n"
+        "Endi botda allaqachon bor foydalanuvchini ham qayta taklif qilish mumkin — "
+        "u shartlarni bajarganda taklif qiluvchiga ball qo'shiladi."
+    )
+    await callback.answer("Yangi loyiha boshlandi.")
+
+
+@router.message(F.text == reply.ADMIN_BUTTON_CLEAR_SCORES)
+async def preview_score_reset(message: Message, session: AsyncSession) -> None:
+    if not await _is_admin(session, message.from_user.id):
+        return
+
+    preview = await AdminService(session).preview_score_reset()
+    await message.answer(
+        _build_score_reset_preview_text(preview),
+        reply_markup=inline.score_reset_confirm_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "admin_score_reset_cancel")
+async def cancel_score_reset(callback: CallbackQuery, session: AsyncSession) -> None:
+    if not await _is_admin(session, callback.from_user.id):
+        await callback.answer()
+        return
+    await callback.message.edit_text("Ballarni tozalash bekor qilindi.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_score_reset_confirm")
+async def run_score_reset(callback: CallbackQuery, session: AsyncSession) -> None:
+    if not await _is_admin(session, callback.from_user.id):
+        await callback.answer()
+        return
+
+    result = await AdminService(session).apply_score_reset()
+    await session.commit()
+
+    logger.info(
+        "Scores cleared by admin=%s, users=%s, sessions=%s",
+        callback.from_user.id,
+        result.cleared_users,
+        result.deleted_sessions,
+    )
+    await callback.message.edit_text(
+        "✅ <b>Ballar tozalandi.</b>\n\n"
+        f"Tozalangan userlar: <b>{result.cleared_users}</b>\n"
+        f"O'chirilgan test sessiyalari: <b>{result.deleted_sessions}</b>\n\n"
+        "\"Kim taklif qilgan\" ma'lumoti o'z holicha qoldi."
+    )
+    await callback.answer("Ballar tozalandi.")

@@ -19,6 +19,9 @@ from bots.Millatchiroqlaribot.repositories import UserRepository as Millatchiroq
 from bots.Barakali_tanlov_bot.handlers.router import build_router as build_barakali_tanlov_bot_router
 from bots.Barakali_tanlov_bot.models import User as BarakaliTanlovBotUser
 from bots.Barakali_tanlov_bot.repositories import UserRepository as BarakaliTanlovBotUserRepo
+from bots.Manfaadli_konkurs_bot.handlers.router import build_router as build_manfaadli_konkurs_bot_router
+from bots.Manfaadli_konkurs_bot.models import User as ManfaadliKonkursBotUser
+from bots.Manfaadli_konkurs_bot.repositories import UserRepository as ManfaadliKonkursBotUserRepo
 from core.admin_init import initialize_admins
 from core.config import settings
 from core.database import AsyncSessionLocal, dispose_engine
@@ -116,6 +119,17 @@ def _build_specs() -> list[PollingBotSpec]:
                 router_builder=build_barakali_tanlov_bot_router,
                 user_model=BarakaliTanlovBotUser,
                 user_repo=BarakaliTanlovBotUserRepo,
+            )
+        )
+    if settings.MANFAADLI_KONKURS_BOT_BOT_TOKEN and settings.MANFAADLI_KONKURS_BOT_MODE == "polling":
+        specs.append(
+            PollingBotSpec(
+                name="manfaadli_konkurs_bot",
+                token=settings.MANFAADLI_KONKURS_BOT_BOT_TOKEN,
+                admin_ids=settings.MANFAADLI_KONKURS_BOT_ADMIN_IDS,
+                router_builder=build_manfaadli_konkurs_bot_router,
+                user_model=ManfaadliKonkursBotUser,
+                user_repo=ManfaadliKonkursBotUserRepo,
             )
         )
     return specs

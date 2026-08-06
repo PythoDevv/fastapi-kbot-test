@@ -19,6 +19,10 @@ from bots.Barakali_tanlov_bot.handlers.router import build_router as build_barak
 from bots.Barakali_tanlov_bot.models import User as BarakaliTanlovBotUser
 from bots.Barakali_tanlov_bot.repositories import UserRepository as BarakaliTanlovBotUserRepo
 from bots.Barakali_tanlov_bot.webapp.router import router as barakali_tanlov_bot_webapp_router
+from bots.Manfaadli_konkurs_bot.handlers.router import build_router as build_manfaadli_konkurs_bot_router
+from bots.Manfaadli_konkurs_bot.models import User as ManfaadliKonkursBotUser
+from bots.Manfaadli_konkurs_bot.repositories import UserRepository as ManfaadliKonkursBotUserRepo
+from bots.Manfaadli_konkurs_bot.webapp.router import router as manfaadli_konkurs_bot_webapp_router
 from core.admin_init import initialize_admins
 from core.config import settings
 from core.database import AsyncSessionLocal, dispose_engine
@@ -109,6 +113,24 @@ async def lifespan(app: FastAPI):
             settings.BARAKALI_TANLOV_BOT_MODE,
         )
 
+    # Register manfaadli_konkurs_bot
+    if settings.MANFAADLI_KONKURS_BOT_BOT_TOKEN and _uses_webhook(settings.MANFAADLI_KONKURS_BOT_MODE):
+        registry.register(
+            app,
+            BotConfig(
+                name="manfaadli_konkurs_bot",
+                token=settings.MANFAADLI_KONKURS_BOT_BOT_TOKEN,
+                webhook_path=settings.MANFAADLI_KONKURS_BOT_WEBHOOK_PATH,
+                router=build_manfaadli_konkurs_bot_router(),
+                admin_ids=settings.MANFAADLI_KONKURS_BOT_ADMIN_IDS,
+            ),
+        )
+    elif settings.MANFAADLI_KONKURS_BOT_BOT_TOKEN:
+        logger.info(
+            "Skipping webhook for 'manfaadli_konkurs_bot' because mode=%s",
+            settings.MANFAADLI_KONKURS_BOT_MODE,
+        )
+
     await registry.set_webhooks()
 
     # Initialize admin users for each bot
@@ -123,6 +145,9 @@ async def lifespan(app: FastAPI):
     if settings.BARAKALI_TANLOV_BOT_BOT_TOKEN:
         async with AsyncSessionLocal() as session:
             await initialize_admins(session, settings.BARAKALI_TANLOV_BOT_ADMIN_IDS, BarakaliTanlovBotUser, BarakaliTanlovBotUserRepo)
+    if settings.MANFAADLI_KONKURS_BOT_BOT_TOKEN:
+        async with AsyncSessionLocal() as session:
+            await initialize_admins(session, settings.MANFAADLI_KONKURS_BOT_ADMIN_IDS, ManfaadliKonkursBotUser, ManfaadliKonkursBotUserRepo)
 
     logger.info("All webhooks set. Ready.")
 
@@ -147,6 +172,7 @@ app.include_router(webapp_router)
 app.include_router(kitobmillatbot_webapp_router)
 app.include_router(millatchiroqlaribot_webapp_router)
 app.include_router(barakali_tanlov_bot_webapp_router)
+app.include_router(manfaadli_konkurs_bot_webapp_router)
 
 
 @app.get("/", include_in_schema=False)
