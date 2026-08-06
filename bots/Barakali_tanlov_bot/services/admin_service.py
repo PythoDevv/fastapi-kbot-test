@@ -139,9 +139,11 @@ class AdminService:
         """Delete all users from database"""
         await self.users.delete_all()
 
-    async def clear_all_solved(self) -> None:
-        """Clear test_solved status for all users"""
+    async def clear_all_solved(self) -> int:
+        """Delete every test session and let all users start again."""
+        deleted_sessions = await self.quiz.delete_all_sessions()
         await self.users.update_all(test_solved=False)
+        return deleted_sessions
 
     async def preview_referral_score_repair(
         self,
@@ -373,6 +375,14 @@ class AdminService:
         if q:
             await self.quiz.delete(q)
             runtime_cache.invalidate_question_ids()
+
+    async def delete_all_questions(self) -> int:
+        from bots.Barakali_tanlov_bot.exceptions import QuestionDeletionBlockedError
+
+        active_session_count = await self.quiz.count_active_sessions()
+        if active_session_count:
+            raise QuestionDeletionBlockedError(0, active_session_count)
+        return await self.quiz.delete_all_questions()
 
     async def list_questions(self) -> list[Question]:
         return await self.quiz.list()

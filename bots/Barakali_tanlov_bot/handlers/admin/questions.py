@@ -118,12 +118,64 @@ async def delete_question(cb: CallbackQuery, session: AsyncSession) -> None:
         await service.delete_question(q_id)
     except QuestionDeletionBlockedError as exc:
         await cb.answer(
-            f"Bu savol {exc.active_sessions_count} ta aktiv testda ishlatilmoqda.",
+            f"Bu savol {exc.active_sessions_count} ta aktiv testda ishlatilmoqda. "
+            "Avval 🧹 Hammani testini tozalash tugmasini bosing.",
             show_alert=True,
         )
         return
     await _show_questions_page(cb, session, page=page)
     await cb.answer("O'chirildi.")
+
+
+@router.callback_query(F.data == "q_delete_all")
+async def request_delete_all_questions(
+    cb: CallbackQuery, session: AsyncSession
+) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+    question_count = len(await AdminService(session).list_questions())
+    if not question_count:
+        await _show_questions_page(cb, session)
+        await cb.answer("O'chiriladigan savol yo'q.")
+        return
+    await cb.message.edit_text(
+        f"⚠️ <b>{question_count} ta savolning barchasi o'chiriladi.</b>\n\n"
+        "Bu amalni ortga qaytarib bo'lmaydi. Davom etasizmi?",
+        reply_markup=inline.questions_delete_all_confirm_keyboard(),
+    )
+    await cb.answer()
+
+
+@router.callback_query(F.data == "q_delete_all_cancel")
+async def cancel_delete_all_questions(
+    cb: CallbackQuery, session: AsyncSession
+) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+    await _show_questions_page(cb, session)
+    await cb.answer("Bekor qilindi.")
+
+
+@router.callback_query(F.data == "q_delete_all_confirm")
+async def confirm_delete_all_questions(
+    cb: CallbackQuery, session: AsyncSession
+) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+    try:
+        deleted_count = await AdminService(session).delete_all_questions()
+    except QuestionDeletionBlockedError as exc:
+        await cb.answer(
+            f"{exc.active_sessions_count} ta aktiv test bor. "
+            "Avval 🧹 Hammani testini tozalash tugmasini bosing.",
+            show_alert=True,
+        )
+        return
+    await _show_questions_page(cb, session)
+    await cb.answer(f"{deleted_count} ta savol o'chirildi.", show_alert=True)
 
 
 @router.callback_query(F.data == "q_template")

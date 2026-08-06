@@ -150,6 +150,15 @@ def questions_list_keyboard(
                 InlineKeyboardButton(text="➡️", callback_data=f"q_page:{page + 1}")
             )
         buttons.append(nav_row)
+    if total:
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text="🗑 Barcha savollarni o'chirish",
+                    callback_data="q_delete_all",
+                )
+            ]
+        )
     buttons.append(
         [
             InlineKeyboardButton(text="➕ Qo'shish", callback_data="q_add"),
@@ -163,6 +172,23 @@ def questions_list_keyboard(
         ]
     )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def questions_delete_all_confirm_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Ha, barchasini o'chirish",
+                    callback_data="q_delete_all_confirm",
+                ),
+                InlineKeyboardButton(
+                    text="❌ Bekor qilish",
+                    callback_data="q_delete_all_cancel",
+                ),
+            ]
+        ]
+    )
 
 
 def user_action_keyboard(telegram_id: int, is_admin: bool) -> InlineKeyboardMarkup:

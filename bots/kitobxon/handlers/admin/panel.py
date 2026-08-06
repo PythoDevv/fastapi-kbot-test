@@ -97,8 +97,11 @@ async def clear_all_solved(message: Message, session: AsyncSession) -> None:
     if message.from_user.id != 935795577:
         await message.answer("Sizda bu komandani ishga tushirish huquqi yo'q.")
         return
-    await AdminService(session).clear_all_solved()
-    await message.answer("Barcha foydalanuvchilarning test yechgan statusi tozalandi.")
+    deleted_sessions = await AdminService(session).clear_all_solved()
+    await message.answer(
+        f"{deleted_sessions} ta test sessiyasi o'chirildi.\n"
+        "Barcha foydalanuvchilar testni boshidan ishlashi mumkin."
+    )
 
 
 @router.message(F.text == "🎡 Ballarni aylantirish")

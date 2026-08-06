@@ -112,6 +112,14 @@ class QuizRepository(BaseRepository[Question]):
         question_ids = await self.get_all_question_ids()
         return len(question_ids)
 
+    async def delete_all_questions(self) -> int:
+        question_count = await self.count()
+        if question_count:
+            await self.session.execute(delete(Question))
+            await self.session.flush()
+            runtime_cache.invalidate_question_ids()
+        return question_count
+
     async def get_all_question_ids(self) -> list[int]:
         cached = runtime_cache.get_question_ids()
         if cached is not None:
@@ -146,6 +154,14 @@ class QuizRepository(BaseRepository[Question]):
             if question_id in question_ids:
                 total += 1
         return total
+
+    async def count_active_sessions(self) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(TestSession)
+            .where(TestSession.is_completed.is_(False))
+        )
+        return int((await self.session.execute(stmt)).scalar_one())
 
     async def acquire_quiz_lock(self, user_id: int) -> None:
         await self.session.execute(
@@ -232,6 +248,19 @@ class QuizRepository(BaseRepository[Question]):
             delete(TestSession).where(TestSession.user_id == user_id)
         )
         await self.session.flush()
+
+    async def delete_all_sessions(self) -> int:
+        session_count = int(
+            (
+                await self.session.execute(
+                    select(func.count()).select_from(TestSession)
+                )
+            ).scalar_one()
+        )
+        if session_count:
+            await self.session.execute(delete(TestSession))
+            await self.session.flush()
+        return session_count
 
     # --- Answers ---
     async def save_answer(self, answer: TestAnswer) -> TestAnswer:
