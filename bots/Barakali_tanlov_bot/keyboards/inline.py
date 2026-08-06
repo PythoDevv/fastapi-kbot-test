@@ -127,9 +127,17 @@ def questions_list_keyboard(
     buttons = [
         [
             InlineKeyboardButton(
-                text=f"🗑 {start + idx + 1}. {q.text[:36]}",
+                text=f"{start + idx + 1}. {q.text[:24]}",
+                callback_data="q_noop",
+            ),
+            InlineKeyboardButton(
+                text="✏️",
+                callback_data=f"q_edit:{q.id}:{page}",
+            ),
+            InlineKeyboardButton(
+                text="🗑",
                 callback_data=f"q_del:{q.id}:{page}",
-            )
+            ),
         ]
         for idx, q in enumerate(page_questions)
     ]
@@ -185,6 +193,23 @@ def questions_delete_all_confirm_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="❌ Bekor qilish",
                     callback_data="q_delete_all_cancel",
+                ),
+            ]
+        ]
+    )
+
+
+def question_answers_edit_choice_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Ha",
+                    callback_data="q_edit_answers_yes",
+                ),
+                InlineKeyboardButton(
+                    text="❌ Yo'q",
+                    callback_data="q_edit_answers_no",
                 ),
             ]
         ]

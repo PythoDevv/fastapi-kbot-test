@@ -418,12 +418,47 @@ class AdminService:
         runtime_cache.invalidate_question_ids()
         return q
 
-    async def delete_question(self, question_id: int) -> None:
+    async def _ensure_question_not_in_active_sessions(self, question_id: int) -> None:
         from bots.Millatchiroqlaribot.exceptions import QuestionDeletionBlockedError
 
         active_session_count = await self.quiz.count_active_sessions_with_question(question_id)
         if active_session_count:
             raise QuestionDeletionBlockedError(question_id, active_session_count)
+
+    async def get_editable_question(self, question_id: int) -> Question | None:
+        await self._ensure_question_not_in_active_sessions(question_id)
+        return await self.quiz.get(question_id)
+
+    async def update_question(
+        self,
+        question_id: int,
+        *,
+        text: str,
+        correct: str | None = None,
+        wrong_1: str | None = None,
+        wrong_2: str | None = None,
+        wrong_3: str | None = None,
+    ) -> bool:
+        await self._ensure_question_not_in_active_sessions(question_id)
+        question = await self.quiz.get(question_id)
+        if question is None:
+            return False
+
+        answers = (correct, wrong_1, wrong_2, wrong_3)
+        if any(answer is not None for answer in answers):
+            if not all(answer is not None for answer in answers):
+                raise ValueError("All answers are required when updating answers")
+            question.correct_answer = correct
+            question.answer_2 = wrong_1
+            question.answer_3 = wrong_2
+            question.answer_4 = wrong_3
+
+        question.text = text
+        await self.session.flush()
+        return True
+
+    async def delete_question(self, question_id: int) -> None:
+        await self._ensure_question_not_in_active_sessions(question_id)
         q = await self.quiz.get(question_id)
         if q:
             await self.quiz.delete(q)

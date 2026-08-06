@@ -51,6 +51,15 @@ class AdminQuestionStates(StatesGroup):
     waiting_confirmation = State()
 
 
+class AdminQuestionEditStates(StatesGroup):
+    waiting_text = State()
+    waiting_answers_choice = State()
+    waiting_correct = State()
+    waiting_wrong_1 = State()
+    waiting_wrong_2 = State()
+    waiting_wrong_3 = State()
+
+
 class AdminQuestionImportStates(StatesGroup):
     waiting_file = State()
 

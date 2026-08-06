@@ -1,4 +1,6 @@
 import asyncio
+from html import escape
+
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Document, Message
@@ -7,7 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bots.kitobxon.exceptions import QuestionDeletionBlockedError
 from bots.kitobxon.keyboards import inline, reply
 from bots.kitobxon.services import AdminService
-from bots.kitobxon.states import AdminQuestionStates, AdminQuestionImportStates
+from bots.kitobxon.states import (
+    AdminQuestionEditStates,
+    AdminQuestionImportStates,
+    AdminQuestionStates,
+)
 from core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -74,6 +80,214 @@ async def paginate_questions(cb: CallbackQuery, session: AsyncSession) -> None:
 @router.callback_query(F.data == "q_page_noop")
 async def noop_questions_page(cb: CallbackQuery) -> None:
     await cb.answer()
+
+
+@router.callback_query(F.data == "q_noop")
+async def noop_question(cb: CallbackQuery) -> None:
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("q_edit:"))
+async def start_edit_question(
+    cb: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    if not await _is_admin(session, cb.from_user.id):
+        await cb.answer()
+        return
+
+    parts = cb.data.split(":")
+    question_id = int(parts[1])
+    service = AdminService(session)
+    try:
+        question = await service.get_editable_question(question_id)
+    except QuestionDeletionBlockedError as exc:
+        await cb.answer(
+            f"Bu savol {exc.active_sessions_count} ta aktiv testda ishlatilmoqda. "
+            "Avval 🧹 Hammani testini tozalash tugmasini bosing.",
+            show_alert=True,
+        )
+        return
+    if question is None:
+        await cb.answer("Savol topilmadi.", show_alert=True)
+        return
+
+    await state.set_state(AdminQuestionEditStates.waiting_text)
+    await state.update_data(edit_question_id=question_id)
+    await cb.message.answer(
+        f"<b>Joriy savol:</b>\n{escape(question.text)}\n\n"
+        "<b>Yangi savol matnini kiriting:</b>",
+        reply_markup=reply.cancel_only(),
+    )
+    await cb.answer()
+
+
+@router.message(
+    AdminQuestionEditStates.waiting_text,
+    F.text == "Bekor qilish",
+)
+@router.message(
+    AdminQuestionEditStates.waiting_answers_choice,
+    F.text == "Bekor qilish",
+)
+@router.message(
+    AdminQuestionEditStates.waiting_correct,
+    F.text == "Bekor qilish",
+)
+@router.message(
+    AdminQuestionEditStates.waiting_wrong_1,
+    F.text == "Bekor qilish",
+)
+@router.message(
+    AdminQuestionEditStates.waiting_wrong_2,
+    F.text == "Bekor qilish",
+)
+@router.message(
+    AdminQuestionEditStates.waiting_wrong_3,
+    F.text == "Bekor qilish",
+)
+async def cancel_edit_question(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await message.answer("Tahrirlash bekor qilindi.", reply_markup=reply.admin_panel())
+
+
+@router.message(AdminQuestionEditStates.waiting_text)
+async def edit_question_text(message: Message, state: FSMContext) -> None:
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("Yangi savol matnini yuboring.")
+        return
+
+    await state.update_data(edit_text=text)
+    await state.set_state(AdminQuestionEditStates.waiting_answers_choice)
+    await message.answer(
+        "Javoblarni ham o'zgartirasizmi?",
+        reply_markup=inline.question_answers_edit_choice_keyboard(),
+    )
+
+
+@router.callback_query(
+    AdminQuestionEditStates.waiting_answers_choice,
+    F.data == "q_edit_answers_yes",
+)
+async def choose_edit_answers(cb: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(AdminQuestionEditStates.waiting_correct)
+    await cb.message.edit_text("Javoblar ham qayta kiritiladi.")
+    await cb.message.answer(
+        "Yangi to'g'ri javobni kiriting:",
+        reply_markup=reply.cancel_only(),
+    )
+    await cb.answer()
+
+
+@router.callback_query(
+    AdminQuestionEditStates.waiting_answers_choice,
+    F.data == "q_edit_answers_no",
+)
+async def keep_existing_answers(
+    cb: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    data = await state.get_data()
+    try:
+        updated = await AdminService(session).update_question(
+            data["edit_question_id"],
+            text=data["edit_text"],
+        )
+    except QuestionDeletionBlockedError as exc:
+        await state.clear()
+        await cb.answer(
+            f"Bu savol {exc.active_sessions_count} ta aktiv testda ishlatilmoqda.",
+            show_alert=True,
+        )
+        await cb.message.answer(
+            "Tahrirlash saqlanmadi.",
+            reply_markup=reply.admin_panel(),
+        )
+        return
+
+    await state.clear()
+    await cb.message.edit_text(
+        "Savol matni yangilandi ✅"
+        if updated
+        else "Savol topilmadi, tahrirlash saqlanmadi."
+    )
+    await cb.message.answer("Admin panel:", reply_markup=reply.admin_panel())
+    await cb.answer()
+
+
+@router.message(AdminQuestionEditStates.waiting_correct)
+async def edit_question_correct(message: Message, state: FSMContext) -> None:
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("Yangi to'g'ri javobni yuboring.")
+        return
+    await state.update_data(edit_correct=text)
+    await state.set_state(AdminQuestionEditStates.waiting_wrong_1)
+    await message.answer("1-yangi noto'g'ri javobni kiriting:")
+
+
+@router.message(AdminQuestionEditStates.waiting_wrong_1)
+async def edit_question_wrong_1(message: Message, state: FSMContext) -> None:
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("1-yangi noto'g'ri javobni yuboring.")
+        return
+    await state.update_data(edit_wrong_1=text)
+    await state.set_state(AdminQuestionEditStates.waiting_wrong_2)
+    await message.answer("2-yangi noto'g'ri javobni kiriting:")
+
+
+@router.message(AdminQuestionEditStates.waiting_wrong_2)
+async def edit_question_wrong_2(message: Message, state: FSMContext) -> None:
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("2-yangi noto'g'ri javobni yuboring.")
+        return
+    await state.update_data(edit_wrong_2=text)
+    await state.set_state(AdminQuestionEditStates.waiting_wrong_3)
+    await message.answer("3-yangi noto'g'ri javobni kiriting:")
+
+
+@router.message(AdminQuestionEditStates.waiting_wrong_3)
+async def edit_question_wrong_3(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    text = (message.text or "").strip()
+    if not text:
+        await message.answer("3-yangi noto'g'ri javobni yuboring.")
+        return
+
+    data = await state.get_data()
+    try:
+        updated = await AdminService(session).update_question(
+            data["edit_question_id"],
+            text=data["edit_text"],
+            correct=data["edit_correct"],
+            wrong_1=data["edit_wrong_1"],
+            wrong_2=data["edit_wrong_2"],
+            wrong_3=text,
+        )
+    except QuestionDeletionBlockedError as exc:
+        await state.clear()
+        await message.answer(
+            f"Bu savol {exc.active_sessions_count} ta aktiv testda ishlatilmoqda. "
+            "Tahrirlash saqlanmadi.",
+            reply_markup=reply.admin_panel(),
+        )
+        return
+
+    await state.clear()
+    await message.answer(
+        "Savol va javoblar yangilandi ✅"
+        if updated
+        else "Savol topilmadi, tahrirlash saqlanmadi.",
+        reply_markup=reply.admin_panel(),
+    )
 
 
 @router.callback_query(F.data == "q_export")
