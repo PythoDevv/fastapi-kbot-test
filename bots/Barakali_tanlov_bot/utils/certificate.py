@@ -1,6 +1,6 @@
 """
 Certificate generator using PIL.
-Template: static/certificates/template.png
+Template: bots/Barakali_tanlov_bot/Barakali_tanlov_bot.jpg
 Fonts: static/fonts/
 """
 import io
@@ -13,12 +13,15 @@ from core.logging import get_logger
 logger = get_logger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parents[3] / "static"
-CERT_TEMPLATE = str(BASE_DIR / "certificates" / "template.png")
-ALT_CERT_TEMPLATE = str(Path(__file__).resolve().parents[1] / "certificate.png")
+BOT_DIR = Path(__file__).resolve().parents[1]
+CERT_TEMPLATE = str(BOT_DIR / "Barakali_tanlov_bot.jpg")
+ALT_CERT_TEMPLATE = str(BASE_DIR / "certificates" / "template.png")
 FONT_DIR = str(BASE_DIR / "fonts")
-NAME_Y_RATIO = 0.44
+# The name line on the Barakali certificate is centered around y=437 in the
+# 1280x906 original template.
+NAME_Y_RATIO = 0.436
 NAME_BASE_FONT_SIZE = 100
-NAME_X_OFFSET = -100
+NAME_X_OFFSET = 0
 
 
 def resolve_certificate_template_path() -> str | None:
@@ -59,10 +62,13 @@ def _format_name_case(name: str) -> str:
 
 def get_name_layout(full_name: str, img_w: int, img_h: int) -> tuple[int, int, int]:
     formatted_name = _format_name_case(full_name.strip())
+    # Keep the name size proportional when a certificate template changes
+    # resolution.  The base size was originally tuned for a 3508px-wide image.
+    base_size = max(24, round(NAME_BASE_FONT_SIZE * img_w / 3508))
     font_size = _get_optimal_font_size(
         formatted_name,
-        int(img_w * 0.8),
-        base_size=NAME_BASE_FONT_SIZE,
+        int(img_w * 0.45),
+        base_size=base_size,
     )
     name_y = int(img_h * NAME_Y_RATIO)
     return font_size, name_y, NAME_X_OFFSET
@@ -72,7 +78,7 @@ def generate_certificate(
     full_name: str,
     score: int,
     total: int,
-    font_name: str = "DejaVuSans.ttf",
+    font_name: str = "DejaVuSans-Bold.ttf",
     include_total: bool = True,
 ) -> io.BytesIO | None:
     """
@@ -122,11 +128,22 @@ def generate_certificate(
             name_font = ImageFont.load_default()
             logger.warning("Could not load TrueType font, using default")
 
-        # Draw name with better positioning
+        # Center the name on the dedicated line in the template.
         bbox = draw.textbbox((0, 0), formatted_name, font=name_font)
         text_w = bbox[2] - bbox[0]
-        text_h = bbox[3] - bbox[1]
         name_x = (img_w - text_w) // 2 + name_x_offset
+
+        # Make exceptionally long full names fit inside the name line.
+        max_name_width = int(img_w * 0.45)
+        while text_w > max_name_width and name_font_size > 24:
+            name_font_size -= 1
+            try:
+                name_font = ImageFont.truetype(font_path, size=name_font_size)
+            except (IOError, OSError):
+                break
+            bbox = draw.textbbox((0, 0), formatted_name, font=name_font)
+            text_w = bbox[2] - bbox[0]
+            name_x = (img_w - text_w) // 2 + name_x_offset
 
         # Draw name with shadow effect for better quality
         shadow_offset = 2
