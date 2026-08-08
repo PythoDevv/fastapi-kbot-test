@@ -110,10 +110,22 @@ async def handle_phone_text(
     message: Message, state: FSMContext, session: AsyncSession, bot: Bot
 ) -> None:
     phone = (message.text or "").strip()
-    if not phone.startswith("+") or len(phone) < 9:
+
+    # Telefon majburiy bo'lgani uchun "Bekor qilish" ro'yxatdan o'tishni
+    # to'xtatmaydi, lekin "noto'g'ri raqam" xabari o'rniga aniq javob berilsin —
+    # aks holda foydalanuvchi shu bosqichda qamalib qoladi.
+    if phone == "Bekor qilish":
+        await message.answer(
+            "Telefon raqami majburiy. Iltimos, quyidagi tugma orqali yuboring:",
+            reply_markup=reply.phone_request(),
+        )
+        return
+
+    digits = phone.removeprefix("+").replace(" ", "").replace("-", "")
+    if not phone.startswith("+") or not digits.isdigit() or len(digits) < 9:
         await message.answer("Iltimos, telefon raqamingizni to'g'ri kiriting (+998...):")
         return
-    await _finish_registration(message, state, session, bot, phone)
+    await _finish_registration(message, state, session, bot, f"+{digits}")
 
 
 async def _finish_registration(
@@ -124,7 +136,10 @@ async def _finish_registration(
     phone: str,
 ) -> None:
     auth = AuthService(session)
-    await auth.set_phone(message.from_user.id, phone)
+    # Telefon so'ralmagan bo'lsa (require_phone_number = False) phone bo'sh keladi —
+    # bunday holda mobile_number ga bo'sh satr yozilmasin.
+    if phone:
+        await auth.set_phone(message.from_user.id, phone)
     await auth.mark_registered(message.from_user.id)
     await state.clear()
 
