@@ -20,6 +20,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from bots.kitobxon.handlers.router import build_router
 from bots.kitobxon.models import User as KitobxonUser
 from bots.kitobxon.repositories import UserRepository as KitobxonUserRepo
+from bots.kitobxon.services.broadcast_service import engine as broadcast_engine
 from core.config import settings
 from core.database import AsyncSessionLocal, dispose_engine
 from core.logging import get_logger, setup_logging
@@ -55,6 +56,9 @@ async def main() -> None:
     me = await bot.get_me()
     logger.info("Polling mode started: @%s", me.username)
 
+    # Pick up any broadcast a previous restart cut off mid-run.
+    await broadcast_engine.resume_pending(bot)
+
     try:
         allowed_updates = list(dp.resolve_used_update_types())
         # Ensure poll_answer updates are allowed
@@ -62,6 +66,9 @@ async def main() -> None:
             allowed_updates.append("poll_answer")
         await dp.start_polling(bot, allowed_updates=allowed_updates)
     finally:
+        # Park any running broadcast before the bot session and the DB engine
+        # are torn down underneath it.
+        await broadcast_engine.pause()
         await bot.session.close()
         await dispose_engine()
         logger.info("Polling stopped.")

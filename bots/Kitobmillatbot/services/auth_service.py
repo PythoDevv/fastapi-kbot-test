@@ -37,6 +37,9 @@ class AuthService:
         )
         if not created and user.username != (username or "") and username:
             user.username = username
+        if user.is_blocked:
+            # They are back — stop skipping them in broadcasts.
+            user.is_blocked = False
         return RegistrationResult(user=user, is_new=created)
 
     async def set_name(self, telegram_id: int, fio: str) -> User:

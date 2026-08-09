@@ -96,11 +96,61 @@ source venv/bin/activate
 python3 main_polling_selected.py
 ```
 
+## Reklama yuborish (broadcast)
+
+Dvigatel: [`core/broadcast.py`](core/broadcast.py). Har bir rassilka bazada
+"job" sifatida saqlanadi, shuning uchun:
+
+- **Restart rassilkani o'ldirmaydi.** Job `cursor_id` bilan yuriladi; servis
+  qayta ishga tushganda tugallanmagan joblar avtomatik davom etadi (webhook
+  uchun `main.py` lifespan, polling uchun har bir `main_polling_*.py`).
+- **Hamma foydalanuvchi oladi — hech qanday filtr yo'q.** Na `is_registered`,
+  na `is_blocked` hisobga olinadi. `users` jadvalidagi har bir qatorga uriniladi.
+- `users.is_blocked` — faqat hisobot uchun: 403 qaytargan foydalanuvchi
+  belgilanadi, `/start` bosilsa tozalanadi. Yuborishga ta'sir qilmaydi
+  (blok olib tashlangan bo'lishi mumkin).
+- **Yetib bormaganlar yozib boriladi** — `<prefix>_broadcast_failures`.
+  Hisobot ostidagi "🔁 Yetib bormaganlarga qayta yuborish" tugmasi faqat
+  o'shalarga yangi job ochadi.
+- Rassilka fon workerida ishlaydi, DB sessiyasi ushlab turilmaydi. Bir botda
+  bir vaqtda bitta job ishlaydi (navbat), Telegram flood limitiga urilmaslik uchun.
+
+### Polling rejimida to'xtatish
+
+Rassilka fon worker'ida ketadi, shuning uchun har bir kirish nuqtasi chiqishda
+`engine.pause()` chaqiradi:
+
+| Qanday to'xtatilsa | Nima bo'ladi |
+|---|---|
+| **Ctrl+C** (terminal) | `finally` ishlaydi → job `pending` bo'lib saqlanadi, qulf bo'shatiladi. Keyingi ishga tushirishda **darhol** o'sha joydan davom etadi, dublikatsiz. |
+| **`kill`** (SIGTERM) yoki **`kill -9`** | Jarayon darhol o'ladi, `finally` ishlamaydi. Kursor oxirgi checkpoint'da qoladi → keyingi start davom ettiradi, **hech kim tushib qolmaydi**, ko'pi bilan ~20 kishiga takror ketishi mumkin. |
+
+O'lik jarayonning qulfi keyingi startda avtomatik tortib olinadi (pid tirikligi
+tekshiriladi), shuning uchun qayta ishga tushirishdan oldin kutish shart emas.
+
+⚠️ **Webhook va pollingni bir vaqtda ishlatmang.** Ikkalasi bitta bazaga
+ulanadi, shuning uchun `broadcast_jobs.locked_by/locked_at` qulfi qo'yilgan:
+jobni faqat bitta jarayon yuboradi, ikkinchisi "owned by another process"
+deb logga yozib, tegmaydi. Bu xavfsizlik to'ri, ish tartibi emas — polling
+oldidan har doim `sudo systemctl stop kbot` qiling.
+
+```sql
+-- Oxirgi rassilkalar holati
+SELECT id, status, total, sent, failed, skipped_blocked, cursor_id, started_at, finished_at
+FROM kitobmillatbot_broadcast_jobs ORDER BY id DESC LIMIT 10;
+
+-- Falon jobda kimga bormadi va nega
+SELECT telegram_id, reason, detail FROM kitobmillatbot_broadcast_failures WHERE job_id = 42;
+```
+
+Tezlikni sozlash: `BroadcastEngine.SEND_DELAY` (standart 50 ms). Amaldagi
+tezlik Telegram API javob vaqti bilan cheklanadi — taxminan 3–7 xabar/sek.
+
 ## Yangi bot qo'shish
 
 1. `bots/yangi_bot/` papkasini yarating (kitobxon strukturasini nusxalang)
 2. `core/config.py` ga token va webhook path qo'shing
-3. `main.py` ga `registry.register(...)` qo'shing
+3. `main.py` ga `registry.register(...)` va `BROADCAST_ENGINES` ga yozuv qo'shing
 4. Migratsiya: `alembic revision --autogenerate -m "add yangi_bot tables"`
 5. `alembic upgrade head`
 6. `sudo systemctl restart kbot`

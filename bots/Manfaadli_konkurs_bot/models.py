@@ -44,6 +44,9 @@ class User(Base, TimestampMixin):
     step: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_registered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Flipped on when Telegram answers 403 during a broadcast, cleared again
+    # on /start — so a user who comes back is not excluded forever.
+    is_blocked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     referrals_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -286,3 +289,75 @@ class ScoreChangeLog(Base, TimestampMixin):
     old_score: Mapped[int] = mapped_column(Integer, nullable=False)
     new_score: Mapped[int] = mapped_column(Integer, nullable=False)
     reason: Mapped[str | None] = mapped_column(Text)
+
+
+# =====================================================================
+# Broadcast jobs (persistent + resumable — engine lives in core/broadcast.py)
+# =====================================================================
+class BroadcastJob(Base, TimestampMixin):
+    """One "Reklama jo'natish" run.
+
+    The row is the source of truth: if the process dies mid-run, the next boot
+    picks the job up from ``cursor_id`` instead of silently dropping everyone
+    who had not been reached yet.
+    """
+
+    __tablename__ = t("broadcast_jobs")
+    __table_args__ = (
+        Index("ix_manfaadli_konkurs_bot_broadcast_jobs_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    admin_telegram_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    source_chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    source_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+    # pending | running | done | failed | cancelled
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    total: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    failed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Recipients that answered 403. Recorded for reporting only — they are
+    # still attempted on every broadcast, because a block can be undone.
+    blocked: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Last processed users.id — or broadcast_failures.id when this is a retry job.
+    cursor_id: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # Where the live progress / final report message lives.
+    status_chat_id: Mapped[int | None] = mapped_column(BigInteger)
+    status_message_id: Mapped[int | None] = mapped_column(BigInteger)
+
+    # Set when this job only re-sends the failures of an earlier job.
+    retry_of_job_id: Mapped[int | None] = mapped_column(Integer)
+    error: Mapped[str | None] = mapped_column(Text)
+
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # Lease held by the process currently sending this job. Webhook and polling
+    # can share one database; without it both would resume the same job and
+    # every user would receive the message twice.
+    locked_by: Mapped[str | None] = mapped_column(String(64))
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class BroadcastFailure(Base, TimestampMixin):
+    """One row per recipient a broadcast could not reach.
+
+    Replaces the old bare ``failed`` counter: without this there is no way to
+    tell who missed the message, nor to re-send only to them.
+    """
+
+    __tablename__ = t("broadcast_failures")
+    __table_args__ = (
+        Index("ix_manfaadli_konkurs_bot_broadcast_failures_job", "job_id", "id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey(f"{t('broadcast_jobs')}.id", ondelete="CASCADE"), nullable=False
+    )
+    telegram_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # blocked | not_found | flood | error
+    reason: Mapped[str] = mapped_column(String(20), nullable=False)
+    detail: Mapped[str | None] = mapped_column(Text)

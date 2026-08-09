@@ -6,6 +6,11 @@ from fastapi import FastAPI
 from bots.kitobxon.handlers.router import build_router as build_kitobxon_router
 from bots.kitobxon.models import User as KitobxonUser
 from bots.kitobxon.repositories import UserRepository as KitobxonUserRepo
+from bots.kitobxon.services.broadcast_service import engine as kitobxon_broadcast
+from bots.Kitobmillatbot.services.broadcast_service import engine as kitobmillatbot_broadcast
+from bots.Millatchiroqlaribot.services.broadcast_service import engine as millatchiroqlaribot_broadcast
+from bots.Barakali_tanlov_bot.services.broadcast_service import engine as barakali_tanlov_bot_broadcast
+from bots.Manfaadli_konkurs_bot.services.broadcast_service import engine as manfaadli_konkurs_bot_broadcast
 from bots.kitobxon.webapp.router import router as webapp_router
 from bots.Kitobmillatbot.handlers.router import build_router as build_kitobmillatbot_router
 from bots.Kitobmillatbot.models import User as KitobmillatbotUser
@@ -35,9 +40,41 @@ logger = get_logger(__name__)
 
 registry = BotRegistry()
 
+# Broadcasts survive restarts: a job cut off mid-run is picked up again here,
+# from the cursor it last persisted.
+BROADCAST_ENGINES = {
+    "kitobxon": kitobxon_broadcast,
+    "kitobmillatbot": kitobmillatbot_broadcast,
+    "millatchiroqlaribot": millatchiroqlaribot_broadcast,
+    "barakali_tanlov_bot": barakali_tanlov_bot_broadcast,
+    "manfaadli_konkurs_bot": manfaadli_konkurs_bot_broadcast,
+}
+
 
 def _uses_webhook(mode: str) -> bool:
     return mode == "webhook"
+
+
+async def _resume_broadcasts() -> None:
+    for name, engine in BROADCAST_ENGINES.items():
+        bot = registry.get_bot(name)
+        if bot is None:
+            continue
+        try:
+            await engine.resume_pending(bot)
+        except Exception:
+            logger.exception("Failed to resume broadcasts for '%s'", name)
+
+
+async def _pause_broadcasts() -> None:
+    """Checkpoint running broadcasts before the bots and the DB engine close."""
+    for name, engine in BROADCAST_ENGINES.items():
+        if registry.get_bot(name) is None:
+            continue
+        try:
+            await engine.pause()
+        except Exception:
+            logger.exception("Failed to pause broadcasts for '%s'", name)
 
 
 @asynccontextmanager
@@ -149,11 +186,14 @@ async def lifespan(app: FastAPI):
         async with AsyncSessionLocal() as session:
             await initialize_admins(session, settings.MANFAADLI_KONKURS_BOT_ADMIN_IDS, ManfaadliKonkursBotUser, ManfaadliKonkursBotUserRepo)
 
+    await _resume_broadcasts()
+
     logger.info("All webhooks set. Ready.")
 
     yield
 
     logger.info("Shutting down...")
+    await _pause_broadcasts()
     await registry.close_all()
     await dispose_engine()
     logger.info("Shutdown complete.")

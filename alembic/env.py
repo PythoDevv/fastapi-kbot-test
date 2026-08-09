@@ -9,6 +9,7 @@ from sqlalchemy import pool
 from core.base_model import Base
 import bots.kitobxon.models  # noqa: F401
 import bots.Kitobmillatbot.models  # noqa: F401
+import bots.Millatchiroqlaribot.models  # noqa: F401
 import bots.Barakali_tanlov_bot.models  # noqa: F401
 import bots.Manfaadli_konkurs_bot.models  # noqa: F401
 

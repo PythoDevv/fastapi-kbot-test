@@ -59,6 +59,11 @@ class BotRegistry:
         self._attach_webhook_route(app, bot, dp, config)
         logger.info("Registered bot '%s' at %s", config.name, config.webhook_path)
 
+    def get_bot(self, name: str) -> Bot | None:
+        """The live Bot instance for a registered bot, if it is enabled."""
+        entry = self._bots.get(name)
+        return entry[0] if entry else None
+
     def _is_duplicate(self, bot_name: str, update_id: int) -> bool:
         seen = self._seen_updates[bot_name]
         if update_id in seen:
