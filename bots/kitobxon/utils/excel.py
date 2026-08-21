@@ -1,10 +1,31 @@
 import csv
 import io
+import sys
+from contextlib import contextmanager
 from typing import Any
 
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
+
+
+@contextmanager
+def _open_csv(path: str):
+    """Open a CSV while allowing large fields and restoring global parser state."""
+    previous_limit = csv.field_size_limit()
+    try:
+        limit = sys.maxsize
+        while True:
+            try:
+                csv.field_size_limit(limit)
+                break
+            except OverflowError:
+                limit //= 2
+
+        with open(path, "r", encoding="utf-8-sig", newline="") as file:
+            yield csv.reader(file)
+    finally:
+        csv.field_size_limit(previous_limit)
 
 
 def export_users_to_excel(users: list) -> io.BytesIO:
@@ -390,8 +411,7 @@ def import_questions_from_excel(path: str) -> tuple[list[dict[str, Any]], list[s
             for row in ws.iter_rows(min_row=2, values_only=True):
                 rows.append(list(row) if row else [])
         elif path.endswith('.csv'):
-            with open(path, 'r', encoding='utf-8') as f:
-                reader = csv.reader(f)
+            with _open_csv(path) as reader:
                 next(reader, None)  # Skip header
                 for row in reader:
                     rows.append(row)
@@ -487,8 +507,7 @@ def import_users_from_excel(path: str) -> tuple[list[dict[str, Any]], list[str]]
             for row in ws.iter_rows(min_row=start_row, values_only=True):
                 rows.append(list(row) if row else [])
         elif path.endswith('.csv'):
-            with open(path, 'r', encoding='utf-8') as f:
-                reader = csv.reader(f)
+            with _open_csv(path) as reader:
                 header = next(reader, None)
                 if header:
                     header_map = _detect_user_import_header_map(header)
