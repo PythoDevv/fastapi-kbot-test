@@ -66,6 +66,7 @@ class ScoreResetResult:
 
 class AdminService:
     MAX_REASONABLE_REFERRAL_COUNT = 1_000_000
+    USER_IMPORT_BATCH_SIZE = 1_000
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -285,38 +286,44 @@ class AdminService:
                 continue
             deduplicated[telegram_id] = data
 
-        existing_users = await self.users.get_by_telegram_ids(list(deduplicated))
-        new_users: list[User] = []
-
-        for telegram_id, data in deduplicated.items():
-            user = existing_users.get(telegram_id)
-            if user:
-                user.fio = data.get("fio") or user.fio
-                user.username = data.get("username") or user.username
-                user.mobile_number = data.get("mobile_number") or user.mobile_number
-                user.referrals_count = data.get("referrals_count", user.referrals_count)
-                user.score = data.get("score", user.score)
-                user.referred_by = data.get("referred_by") or user.referred_by
-                user.is_registered = True
-                updated += 1
-                continue
-
-            new_users.append(
-                User(
-                    telegram_id=telegram_id,
-                    fio=data.get("fio"),
-                    username=data.get("username"),
-                    mobile_number=data.get("mobile_number"),
-                    referrals_count=data.get("referrals_count", 0),
-                    score=data.get("score", 0),
-                    referred_by=data.get("referred_by"),
-                    is_registered=True,
-                )
+        items = list(deduplicated.items())
+        for start in range(0, len(items), self.USER_IMPORT_BATCH_SIZE):
+            batch = items[start : start + self.USER_IMPORT_BATCH_SIZE]
+            existing_users = await self.users.get_by_telegram_ids(
+                [telegram_id for telegram_id, _ in batch]
             )
-            created += 1
+            new_users: list[User] = []
 
-        if new_users:
-            self.session.add_all(new_users)
+            for telegram_id, data in batch:
+                user = existing_users.get(telegram_id)
+                if user:
+                    user.fio = data.get("fio") or user.fio
+                    user.username = data.get("username") or user.username
+                    user.mobile_number = data.get("mobile_number") or user.mobile_number
+                    user.referrals_count = data.get("referrals_count", user.referrals_count)
+                    user.score = data.get("score", user.score)
+                    user.referred_by = data.get("referred_by") or user.referred_by
+                    user.is_registered = True
+                    updated += 1
+                    continue
+
+                new_users.append(
+                    User(
+                        telegram_id=telegram_id,
+                        fio=data.get("fio"),
+                        username=data.get("username"),
+                        mobile_number=data.get("mobile_number"),
+                        referrals_count=data.get("referrals_count", 0),
+                        score=data.get("score", 0),
+                        referred_by=data.get("referred_by"),
+                        is_registered=True,
+                    )
+                )
+                created += 1
+
+            if new_users:
+                self.session.add_all(new_users)
+            await self.session.flush()
 
         await self.session.commit()
         return updated, created, skipped

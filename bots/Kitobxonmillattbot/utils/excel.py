@@ -2,30 +2,34 @@ import csv
 import io
 import sys
 from contextlib import contextmanager
+from threading import Lock
 from typing import Any
 
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+_CSV_FIELD_SIZE_LOCK = Lock()
+
 
 @contextmanager
 def _open_csv(path: str):
     """Open a CSV while allowing large fields and restoring global parser state."""
-    previous_limit = csv.field_size_limit()
-    try:
-        limit = sys.maxsize
-        while True:
-            try:
-                csv.field_size_limit(limit)
-                break
-            except OverflowError:
-                limit //= 2
+    with _CSV_FIELD_SIZE_LOCK:
+        previous_limit = csv.field_size_limit()
+        try:
+            limit = sys.maxsize
+            while True:
+                try:
+                    csv.field_size_limit(limit)
+                    break
+                except OverflowError:
+                    limit //= 2
 
-        with open(path, "r", encoding="utf-8-sig", newline="") as file:
-            yield csv.reader(file)
-    finally:
-        csv.field_size_limit(previous_limit)
+            with open(path, "r", encoding="utf-8-sig", newline="") as file:
+                yield csv.reader(file)
+        finally:
+            csv.field_size_limit(previous_limit)
 
 
 def export_users_to_excel(users: list) -> io.BytesIO:

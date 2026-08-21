@@ -6,6 +6,7 @@ cleared before the registered user's name is rendered in the reserved line.
 import io
 import os
 from pathlib import Path
+from uuid import uuid4
 
 from aiogram.types import BufferedInputFile
 from core.logging import get_logger
@@ -18,11 +19,16 @@ CERT_TEMPLATE = str(BOT_DIR / "manfaatli.jpg")
 ALT_CERT_TEMPLATE = str(BASE_DIR / "certificates" / "template.png")
 FONT_DIR = str(BASE_DIR / "fonts")
 # The name line belongs to the left-hand certificate area, not the full image.
-NAME_Y_RATIO = 0.605
+# The text must sit above the line; the line itself is at approximately y=608
+# in manfaatli.jpg (1024px high).
+NAME_LINE_Y_RATIO = 0.594
+NAME_Y_RATIO = 0.558
 NAME_CENTER_X_RATIO = 0.362
 NAME_BASE_FONT_SIZE = 32
 NAME_MAX_WIDTH_RATIO = 0.47
-NAME_CLEAR_BOX = (0.11, 0.603, 0.62, 0.65)
+# Keep this box above the line.  The source template's
+# "To‘g‘ay Murodning" text is below the line and must never be cleared.
+NAME_CLEAR_BOX = (0.11, 0.54, 0.62, 0.588)
 
 
 def resolve_certificate_template_path() -> str | None:
@@ -34,10 +40,17 @@ def resolve_certificate_template_path() -> str | None:
 
 
 def build_certificate_input_file(
-    buffer: io.BytesIO, filename: str = "sertifikat.jpg"
+    buffer: io.BytesIO, filename: str | None = None
 ) -> BufferedInputFile:
     buffer.seek(0)
+    if filename is None:
+        filename = f"sertifikat_{uuid4().hex}.jpg"
     return BufferedInputFile(buffer.read(), filename=filename)
+
+
+def get_name_draw_y(line_y: int, text_bbox: tuple[int, int, int, int]) -> int:
+    """Return a draw coordinate whose glyph bottom rests on the name line."""
+    return line_y - text_bbox[3]
 
 
 def _get_optimal_font_size(text: str, max_width: int, base_size: int = 60) -> int:
@@ -137,7 +150,7 @@ def generate_certificate(
 
         # Format name with proper case
         formatted_name = _format_name_case(full_name.strip())
-        name_font_size, name_y, name_x_offset = get_name_layout(full_name, img_w, img_h)
+        name_font_size, _, name_x_offset = get_name_layout(full_name, img_w, img_h)
 
         _clear_name_area(img)
         draw = ImageDraw.Draw(img)
@@ -153,6 +166,8 @@ def generate_certificate(
         bbox = draw.textbbox((0, 0), formatted_name, font=name_font)
         text_w = bbox[2] - bbox[0]
         name_x = (img_w - text_w) // 2 + name_x_offset
+        name_line_y = int(img_h * NAME_LINE_Y_RATIO)
+        name_y = get_name_draw_y(name_line_y, bbox)
 
         # Keep very long names inside the dedicated line.
         max_name_width = int(img_w * NAME_MAX_WIDTH_RATIO)
@@ -165,6 +180,7 @@ def generate_certificate(
             bbox = draw.textbbox((0, 0), formatted_name, font=name_font)
             text_w = bbox[2] - bbox[0]
             name_x = (img_w - text_w) // 2 + name_x_offset
+            name_y = get_name_draw_y(name_line_y, bbox)
 
         draw.text(
             (name_x, name_y),

@@ -22,7 +22,7 @@ class UserImportTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "users.csv"
-            with path.open("w", encoding="utf-8", newline="") as file:
+            with path.open("w", encoding="utf-8-sig", newline="") as file:
                 writer = csv.writer(file)
                 writer.writerow(
                     [

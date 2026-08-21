@@ -73,7 +73,11 @@ class QuizRepository(BaseRepository[Question]):
     # --- Settings ---
     async def get_settings(self) -> QuizSettings | None:
         stmt = select(QuizSettings).order_by(QuizSettings.id).limit(1)
-        return (await self.session.execute(stmt)).scalar_one_or_none()
+        settings = (await self.session.execute(stmt)).scalar_one_or_none()
+        runtime_cache.set_certificate_button_enabled(
+            bool(settings and settings.show_certificate_button)
+        )
+        return settings
 
     async def ensure_settings(self) -> QuizSettings:
         existing = await self.get_settings()

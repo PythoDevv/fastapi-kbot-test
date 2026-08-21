@@ -8,7 +8,11 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bots.Manfaadli_konkurs_bot.keyboards import reply
-from bots.Manfaadli_konkurs_bot.repositories import ContentRepository, UserRepository
+from bots.Manfaadli_konkurs_bot.repositories import (
+    ContentRepository,
+    QuizRepository,
+    UserRepository,
+)
 from bots.Manfaadli_konkurs_bot.services import AuthService, SubsService
 from bots.Manfaadli_konkurs_bot.states import AuthStates
 from core.config import settings
@@ -49,6 +53,7 @@ async def back_to_menu(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
     await state.clear()
+    await QuizRepository(session).get_settings()
     await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
 
 
@@ -56,7 +61,7 @@ async def back_to_menu(
 async def change_name(message: Message, state: FSMContext) -> None:
     await state.set_state(AuthStates.changing_name)
     await message.answer(
-        "Yangi oila nomini kiriting:", reply_markup=reply.cancel_only()
+        "Ismingizni kiriting:", reply_markup=reply.cancel_only()
     )
 
 

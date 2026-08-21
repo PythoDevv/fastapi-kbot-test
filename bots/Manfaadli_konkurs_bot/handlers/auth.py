@@ -53,6 +53,7 @@ async def _handle_name_submission(
     text = (message.text or "").strip()
     if text == "Bekor qilish":
         await state.clear()
+        await QuizRepository(session).get_settings()
         user_repo = UserRepository(session)
         user = await user_repo.get_by_telegram_id(message.from_user.id)
         if user and user.is_admin:
@@ -186,5 +187,6 @@ async def handle_name_change(
         await message.answer("Iltimos, Ismingiz va familiyangizni kiriting\n\n Misol uchun : Alijonov Alisher")
         return
     await AuthService(session).set_name(message.from_user.id, text)
+    await QuizRepository(session).get_settings()
     await state.clear()
     await message.answer(f"Ismingiz o'zgartirildi: <b>{text}</b>", reply_markup=reply.main_menu())

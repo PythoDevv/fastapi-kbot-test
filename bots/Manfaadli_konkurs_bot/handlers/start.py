@@ -36,6 +36,7 @@ async def _continue_after_subscription(
     user: User,
 ) -> bool:
     if user.is_registered:
+        await QuizRepository(session).get_settings()
         await message.answer("Asosiy menyu:", reply_markup=reply.main_menu())
         return True
 

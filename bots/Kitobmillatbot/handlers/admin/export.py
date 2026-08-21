@@ -23,8 +23,10 @@ from bots.Kitobmillatbot.utils.excel import (
     export_users_to_excel,
     import_users_from_excel,
 )
+from core.logging import get_logger
 
 router = Router(name="admin_export")
+logger = get_logger(__name__)
 
 
 def _format_completed_at(value) -> str:
@@ -365,16 +367,18 @@ async def import_users_file(
         await message.answer("❌ Fayl formati noto'g'ri.\nFaqat .xlsx yoki .csv fayllar qabul qilinadi.")
         return
 
-    # Download file
-    file = await message.bot.get_file(doc.file_id)
     file_ext = ".xlsx" if file_name.endswith(".xlsx") else ".csv"
-    with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
-        await message.bot.download_file(file.file_path, tmp)
-        tmp_path = tmp.name
-
+    tmp_path: str | None = None
     try:
         progress = await message.answer("Fayl qayta ishlanmoqda... ⏳")
-        users_data, errors = import_users_from_excel(tmp_path)
+        file = await message.bot.get_file(doc.file_id)
+        with tempfile.NamedTemporaryFile(suffix=file_ext, delete=False) as tmp:
+            await message.bot.download_file(file.file_path, tmp)
+            tmp_path = tmp.name
+
+        users_data, errors = await asyncio.to_thread(
+            import_users_from_excel, tmp_path
+        )
 
         if not users_data:
             await message.answer("Faylda ma'lumot topilmadi.")
@@ -405,10 +409,16 @@ async def import_users_file(
 
         await state.clear()
     except Exception as e:
+        await session.rollback()
+        logger.exception("User import failed for admin %s", message.from_user.id)
         await message.answer(f"❌ Xato: {str(e)}")
         await state.clear()
     finally:
-        os.unlink(tmp_path)
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except FileNotFoundError:
+                pass
 
 
 @router.message(AdminImportStates.waiting_users_file)
