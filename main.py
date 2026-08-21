@@ -28,6 +28,10 @@ from bots.Manfaadli_konkurs_bot.handlers.router import build_router as build_man
 from bots.Manfaadli_konkurs_bot.models import User as ManfaadliKonkursBotUser
 from bots.Manfaadli_konkurs_bot.repositories import UserRepository as ManfaadliKonkursBotUserRepo
 from bots.Manfaadli_konkurs_bot.webapp.router import router as manfaadli_konkurs_bot_webapp_router
+from bots.Kitobxonmillattbot.handlers.router import build_router as build_kitobxonmillattbot_router
+from bots.Kitobxonmillattbot.models import User as KitobxonmillattbotUser
+from bots.Kitobxonmillattbot.repositories import UserRepository as KitobxonmillattbotUserRepo
+from bots.Kitobxonmillattbot.webapp.router import router as kitobxonmillattbot_webapp_router
 from core.admin_init import initialize_admins
 from core.config import settings
 from core.database import AsyncSessionLocal, dispose_engine
@@ -168,6 +172,24 @@ async def lifespan(app: FastAPI):
             settings.MANFAADLI_KONKURS_BOT_MODE,
         )
 
+    # Register kitobxonmillattbot
+    if settings.KITOBXONMILLATTBOT_BOT_TOKEN and _uses_webhook(settings.KITOBXONMILLATTBOT_MODE):
+        registry.register(
+            app,
+            BotConfig(
+                name="kitobxonmillattbot",
+                token=settings.KITOBXONMILLATTBOT_BOT_TOKEN,
+                webhook_path=settings.KITOBXONMILLATTBOT_WEBHOOK_PATH,
+                router=build_kitobxonmillattbot_router(),
+                admin_ids=settings.KITOBXONMILLATTBOT_ADMIN_IDS,
+            ),
+        )
+    elif settings.KITOBXONMILLATTBOT_BOT_TOKEN:
+        logger.info(
+            "Skipping webhook for 'kitobxonmillattbot' because mode=%s",
+            settings.KITOBXONMILLATTBOT_MODE,
+        )
+
     await registry.set_webhooks()
 
     # Initialize admin users for each bot
@@ -185,6 +207,9 @@ async def lifespan(app: FastAPI):
     if settings.MANFAADLI_KONKURS_BOT_BOT_TOKEN:
         async with AsyncSessionLocal() as session:
             await initialize_admins(session, settings.MANFAADLI_KONKURS_BOT_ADMIN_IDS, ManfaadliKonkursBotUser, ManfaadliKonkursBotUserRepo)
+    if settings.KITOBXONMILLATTBOT_BOT_TOKEN:
+        async with AsyncSessionLocal() as session:
+            await initialize_admins(session, settings.KITOBXONMILLATTBOT_ADMIN_IDS, KitobxonmillattbotUser, KitobxonmillattbotUserRepo)
 
     await _resume_broadcasts()
 
@@ -213,6 +238,7 @@ app.include_router(kitobmillatbot_webapp_router)
 app.include_router(millatchiroqlaribot_webapp_router)
 app.include_router(barakali_tanlov_bot_webapp_router)
 app.include_router(manfaadli_konkurs_bot_webapp_router)
+app.include_router(kitobxonmillattbot_webapp_router)
 
 
 @app.get("/", include_in_schema=False)

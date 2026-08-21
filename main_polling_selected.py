@@ -27,6 +27,10 @@ from bots.Manfaadli_konkurs_bot.handlers.router import build_router as build_man
 from bots.Manfaadli_konkurs_bot.models import User as ManfaadliKonkursBotUser
 from bots.Manfaadli_konkurs_bot.repositories import UserRepository as ManfaadliKonkursBotUserRepo
 from bots.Manfaadli_konkurs_bot.services.broadcast_service import engine as manfaadli_konkurs_bot_broadcast
+from bots.Kitobxonmillattbot.handlers.router import build_router as build_kitobxonmillattbot_router
+from bots.Kitobxonmillattbot.models import User as KitobxonmillattbotUser
+from bots.Kitobxonmillattbot.repositories import UserRepository as KitobxonmillattbotUserRepo
+from bots.Kitobxonmillattbot.services.broadcast_service import engine as kitobxonmillattbot_broadcast
 from core.admin_init import initialize_admins
 from core.config import settings
 from core.database import AsyncSessionLocal, dispose_engine
@@ -146,6 +150,18 @@ def _build_specs() -> list[PollingBotSpec]:
                 user_model=ManfaadliKonkursBotUser,
                 user_repo=ManfaadliKonkursBotUserRepo,
                 broadcast_engine=manfaadli_konkurs_bot_broadcast,
+            )
+        )
+    if settings.KITOBXONMILLATTBOT_BOT_TOKEN and settings.KITOBXONMILLATTBOT_MODE == "polling":
+        specs.append(
+            PollingBotSpec(
+                name="kitobxonmillattbot",
+                token=settings.KITOBXONMILLATTBOT_BOT_TOKEN,
+                admin_ids=settings.KITOBXONMILLATTBOT_ADMIN_IDS,
+                router_builder=build_kitobxonmillattbot_router,
+                user_model=KitobxonmillattbotUser,
+                user_repo=KitobxonmillattbotUserRepo,
+                broadcast_engine=kitobxonmillattbot_broadcast,
             )
         )
     return specs

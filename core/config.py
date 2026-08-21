@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     MANFAADLI_KONKURS_BOT_WEBHOOK_PATH: str = "/manfaadli_konkurs_bot/webhook"
     MANFAADLI_KONKURS_BOT_MODE: Literal["webhook", "polling", "disabled"] = "webhook"
 
+    KITOBXONMILLATTBOT_BOT_TOKEN: str = ""
+    KITOBXONMILLATTBOT_ADMIN_IDS: list[int] = Field(default_factory=lambda: [935795577])
+    KITOBXONMILLATTBOT_WEBHOOK_PATH: str = "/kitobxonmillattbot/webhook"
+    KITOBXONMILLATTBOT_MODE: Literal["webhook", "polling", "disabled"] = "webhook"
+
     WEBAPP_JWT_SECRET: str = "change-me-webapp-jwt-secret-32chars"
     WEBAPP_JWT_TTL_SECONDS: int = 60 * 60 * 5
 
