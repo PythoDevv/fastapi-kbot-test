@@ -16,7 +16,9 @@ BASE_DIR = Path(__file__).resolve().parents[3] / "static"
 CERT_TEMPLATE = str(BASE_DIR / "certificates" / "template.png")
 ALT_CERT_TEMPLATE = str(Path(__file__).resolve().parents[1] / "certificate.png")
 FONT_DIR = str(BASE_DIR / "fonts")
-NAME_Y_RATIO = 0.44
+# The horizontal name line in static/certificates/template.png.
+NAME_Y_RATIO = 0.488
+NAME_LINE_GAP = 12
 NAME_BASE_FONT_SIZE = 100
 NAME_X_OFFSET = -100
 
@@ -66,6 +68,11 @@ def get_name_layout(full_name: str, img_w: int, img_h: int) -> tuple[int, int, i
     )
     name_y = int(img_h * NAME_Y_RATIO)
     return font_size, name_y, NAME_X_OFFSET
+
+
+def get_name_draw_y(line_y: int, text_bbox: tuple[int, int, int, int]) -> int:
+    """Return a PIL text origin that keeps the name above the line."""
+    return line_y - NAME_LINE_GAP - text_bbox[3]
 
 
 def generate_certificate(
@@ -125,20 +132,20 @@ def generate_certificate(
         # Draw name with better positioning
         bbox = draw.textbbox((0, 0), formatted_name, font=name_font)
         text_w = bbox[2] - bbox[0]
-        text_h = bbox[3] - bbox[1]
         name_x = (img_w - text_w) // 2 + name_x_offset
+        name_draw_y = get_name_draw_y(name_y, bbox)
 
         # Draw name with shadow effect for better quality
         shadow_offset = 2
         draw.text(
-            (name_x + shadow_offset, name_y + shadow_offset),
+            (name_x + shadow_offset, name_draw_y + shadow_offset),
             formatted_name,
             font=name_font,
             fill=(200, 200, 200, 100),
         )
         # Main name text
         draw.text(
-            (name_x, name_y),
+            (name_x, name_draw_y),
             formatted_name,
             font=name_font,
             fill=(33, 33, 33, 255),

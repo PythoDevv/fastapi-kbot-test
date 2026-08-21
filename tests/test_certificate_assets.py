@@ -64,6 +64,15 @@ class CertificateAssetResolutionTests(unittest.TestCase):
         self.assertEqual(name_y, int(2480 * 0.44))
         self.assertEqual(name_x_offset, -100)
 
+    def test_kitobxonmillattbot_name_is_drawn_above_the_line(self) -> None:
+        module = _import_certificate_module("bots.Kitobxonmillattbot.utils.certificate")
+        line_y = 1210
+        text_bbox = (0, 17, 816, 114)
+
+        draw_y = module.get_name_draw_y(line_y, text_bbox)
+
+        self.assertLess(draw_y + text_bbox[3], line_y)
+
 
 if __name__ == "__main__":
     unittest.main()
