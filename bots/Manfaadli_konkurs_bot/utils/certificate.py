@@ -1,7 +1,7 @@
-"""
-Certificate generator using PIL.
-Template: static/certificates/template.png
-Fonts: static/fonts/
+"""Generate personalised certificates for the Manfaadli konkurs bot.
+
+The certificate template contains a sample participant name.  The sample is
+cleared before the registered user's name is rendered in the reserved line.
 """
 import io
 import os
@@ -13,12 +13,16 @@ from core.logging import get_logger
 logger = get_logger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parents[3] / "static"
-CERT_TEMPLATE = str(BASE_DIR / "certificates" / "template.png")
-ALT_CERT_TEMPLATE = str(Path(__file__).resolve().parents[1] / "certificate.png")
+BOT_DIR = Path(__file__).resolve().parents[1]
+CERT_TEMPLATE = str(BOT_DIR / "manfaatli.jpg")
+ALT_CERT_TEMPLATE = str(BASE_DIR / "certificates" / "template.png")
 FONT_DIR = str(BASE_DIR / "fonts")
-NAME_Y_RATIO = 0.44
-NAME_BASE_FONT_SIZE = 100
-NAME_X_OFFSET = -100
+# The name line belongs to the left-hand certificate area, not the full image.
+NAME_Y_RATIO = 0.605
+NAME_CENTER_X_RATIO = 0.362
+NAME_BASE_FONT_SIZE = 32
+NAME_MAX_WIDTH_RATIO = 0.47
+NAME_CLEAR_BOX = (0.11, 0.603, 0.62, 0.65)
 
 
 def resolve_certificate_template_path() -> str | None:
@@ -29,7 +33,9 @@ def resolve_certificate_template_path() -> str | None:
     return None
 
 
-def build_certificate_input_file(buffer: io.BytesIO, filename: str = "certificate.png") -> BufferedInputFile:
+def build_certificate_input_file(
+    buffer: io.BytesIO, filename: str = "sertifikat.jpg"
+) -> BufferedInputFile:
     buffer.seek(0)
     return BufferedInputFile(buffer.read(), filename=filename)
 
@@ -61,22 +67,40 @@ def get_name_layout(full_name: str, img_w: int, img_h: int) -> tuple[int, int, i
     formatted_name = _format_name_case(full_name.strip())
     font_size = _get_optimal_font_size(
         formatted_name,
-        int(img_w * 0.8),
+        int(img_w * NAME_MAX_WIDTH_RATIO),
         base_size=NAME_BASE_FONT_SIZE,
     )
     name_y = int(img_h * NAME_Y_RATIO)
-    return font_size, name_y, NAME_X_OFFSET
+    name_x_offset = int(img_w * NAME_CENTER_X_RATIO - img_w / 2)
+    return font_size, name_y, name_x_offset
+
+
+def _clear_name_area(image) -> None:
+    """Remove the sample name while keeping the template's background intact."""
+    img_w, img_h = image.size
+    left = int(img_w * NAME_CLEAR_BOX[0])
+    top = int(img_h * NAME_CLEAR_BOX[1])
+    right = int(img_w * NAME_CLEAR_BOX[2])
+    bottom = int(img_h * NAME_CLEAR_BOX[3])
+
+    # A blank strip to the left of the name has the same paper texture and does
+    # not contain any other printed content.  Stretching it over the name area
+    # avoids leaving a visible solid-colour rectangle or remnants of the
+    # template's sample name.
+    source = image.crop((left + 10, top, left + 80, bottom))
+    background = source.resize((right - left, bottom - top))
+    image.paste(background, (left, top))
 
 
 def generate_certificate(
     full_name: str,
     score: int,
     total: int,
-    font_name: str = "DejaVuSans.ttf",
-    include_total: bool = True,
+    font_name: str = "DejaVuSans-Bold.ttf",
+    include_total: bool = False,
 ) -> io.BytesIO | None:
     """
-    Generate a high-quality certificate PNG and return as BytesIO.
+    Generate a high-quality certificate JPEG and return as BytesIO.
 
     Features:
     - Adaptive font sizing based on name length
@@ -106,14 +130,17 @@ def generate_certificate(
 
     font_path = os.path.join(FONT_DIR, font_name)
     try:
-        img = Image.open(template_path).convert("RGBA")
-        draw = ImageDraw.Draw(img, "RGBA")
+        img = Image.open(template_path).convert("RGB")
+        draw = ImageDraw.Draw(img)
 
         img_w, img_h = img.size
 
         # Format name with proper case
         formatted_name = _format_name_case(full_name.strip())
         name_font_size, name_y, name_x_offset = get_name_layout(full_name, img_w, img_h)
+
+        _clear_name_area(img)
+        draw = ImageDraw.Draw(img)
 
         # Name font
         try:
@@ -125,26 +152,29 @@ def generate_certificate(
         # Draw name with better positioning
         bbox = draw.textbbox((0, 0), formatted_name, font=name_font)
         text_w = bbox[2] - bbox[0]
-        text_h = bbox[3] - bbox[1]
         name_x = (img_w - text_w) // 2 + name_x_offset
 
-        # Draw name with shadow effect for better quality
-        shadow_offset = 2
-        draw.text(
-            (name_x + shadow_offset, name_y + shadow_offset),
-            formatted_name,
-            font=name_font,
-            fill=(200, 200, 200, 100),
-        )
-        # Main name text
+        # Keep very long names inside the dedicated line.
+        max_name_width = int(img_w * NAME_MAX_WIDTH_RATIO)
+        while text_w > max_name_width and name_font_size > 20:
+            name_font_size -= 1
+            try:
+                name_font = ImageFont.truetype(font_path, size=name_font_size)
+            except (IOError, OSError):
+                break
+            bbox = draw.textbbox((0, 0), formatted_name, font=name_font)
+            text_w = bbox[2] - bbox[0]
+            name_x = (img_w - text_w) // 2 + name_x_offset
+
         draw.text(
             (name_x, name_y),
             formatted_name,
             font=name_font,
-            fill=(33, 33, 33, 255),
+            fill=(33, 33, 33),
         )
 
         if include_total:
+            shadow_offset = 2
             # Score font
             try:
                 score_font = ImageFont.truetype(font_path, size=40)
@@ -162,21 +192,18 @@ def generate_certificate(
                 (score_x + shadow_offset, score_y + shadow_offset),
                 score_text,
                 font=score_font,
-                fill=(200, 200, 200, 100),
+                fill=(200, 200, 200),
             )
             # Main score text
             draw.text(
                 (score_x, score_y),
                 score_text,
                 font=score_font,
-                fill=(80, 80, 80, 255),
+                fill=(80, 80, 80),
             )
 
         output = io.BytesIO()
-        # Convert to RGB and save with high quality
-        img_rgb = Image.new("RGB", img.size, (255, 255, 255))
-        img_rgb.paste(img, mask=img.split()[3] if img.mode == "RGBA" else None)
-        img_rgb.save(output, format="PNG", quality=95, optimize=False)
+        img.save(output, format="JPEG", quality=95, optimize=True)
         output.seek(0)
         return output
 
